@@ -669,6 +669,24 @@ def getSquaresFromImage(image_path,debug=False):
             pts = sq.astype(int).reshape(-1, 1, 2)
             cv2.polylines(vis, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
 
+        square_images = []
+
+        for sq in squares:
+            sq = sq.astype(int)
+
+            xs = sq[:, 0]
+            ys = sq[:, 1]
+
+            x_min, x_max = xs.min(), xs.max()
+            y_min, y_max = ys.min(), ys.max()
+
+            square_img = warped[y_min:y_max, x_min:x_max]
+
+            # Optional: make uniform size for all squares
+            square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
+
+            square_images.append(square_img)
+
         if debug:
             plt.figure(figsize=(6,6))
             plt.title("Detected Chessboard Squares")
@@ -676,7 +694,7 @@ def getSquaresFromImage(image_path,debug=False):
             plt.axis('off')
             plt.show()
         
-        return squares
+        return square_images
 
 getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test3.jpg")
 
