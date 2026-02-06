@@ -71,61 +71,63 @@ def getSquaresFromImage(image_path,debug=False):
 
         min_dist = 10  # pixels (tune: 8–15 works well)
 
-        filtered = []
+        # filtered = []
 
-        for p in points:
-            if all(np.linalg.norm(p - np.array(q)) > min_dist for q in filtered):
-                filtered.append(p)
+        # for p in points:
+        #     if all(np.linalg.norm(p - np.array(q)) > min_dist for q in filtered):
+        #         filtered.append(p)
 
-        filtered = np.array(filtered)
+        # filtered = np.array(filtered)
 
-        points = filtered
-        center = points.mean(axis=0)
-        cx, cy = int(center[0]), int(center[1])
+        # points = filtered
+        # center = points.mean(axis=0)
+        # cx, cy = int(center[0]), int(center[1])
 
-        distances = np.linalg.norm(points - center, axis=1)
+        # distances = np.linalg.norm(points - center, axis=1)
 
-        mean_dist = np.mean(distances)
-        std_dist = np.std(distances)
+        # mean_dist = np.mean(distances)
+        # std_dist = np.std(distances)
 
-        k = 1.5  # start with 1.5–2.0
-        mask = distances < (mean_dist + k * std_dist)
+        # k = 1.5  # start with 1.5–2.0
+        # mask = distances < (mean_dist + k * std_dist)
 
-        filtered_points = points[mask]
+        # filtered_points = points[mask]
 
-        img_before = img.copy()
-        for x, y in points:
-            cv2.circle(img_before, (int(x), int(y)), 3, (0, 0, 255), -1)
+        filtered_points = points
 
-        # Draw mean point (before)
-        cv2.circle(img_before, (cx, cy), 8, (0, 255, 255), -1)   # yellow
-        cv2.putText(img_before, "Mean", (cx+10, cy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
+        # img_before = img.copy()
+        # for x, y in points:
+        #     cv2.circle(img_before, (int(x), int(y)), 3, (0, 0, 255), -1)
+
+        # # Draw mean point (before)
+        # cv2.circle(img_before, (cx, cy), 8, (0, 255, 255), -1)   # yellow
+        # cv2.putText(img_before, "Mean", (cx+10, cy),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
 
 
-        img_after = img.copy()
-        for x, y in filtered_points:
-            cv2.circle(img_after, (int(x), int(y)), 3, (0, 255, 0), -1)
+        # img_after = img.copy()
+        # for x, y in filtered_points:
+        #     cv2.circle(img_after, (int(x), int(y)), 3, (0, 255, 0), -1)
 
-        # Draw mean point (after)
-        cv2.circle(img_after, (cx, cy), 8, (0, 255, 255), -1)
-        cv2.putText(img_after, "Mean", (cx+10, cy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
+        # # Draw mean point (after)
+        # cv2.circle(img_after, (cx, cy), 8, (0, 255, 255), -1)
+        # cv2.putText(img_after, "Mean", (cx+10, cy),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
 
-        if debug:
-            plt.figure(figsize=(12,6))
+        # if debug:
+        #     plt.figure(figsize=(12,6))
 
-            plt.subplot(1,2,1)
-            plt.title("Before Center-Based Filtering")
-            plt.imshow(cv2.cvtColor(img_before, cv2.COLOR_BGR2RGB))
-            plt.axis('off')
+        #     plt.subplot(1,2,1)
+        #     plt.title("Before Center-Based Filtering")
+        #     plt.imshow(cv2.cvtColor(img_before, cv2.COLOR_BGR2RGB))
+        #     plt.axis('off')
 
-            plt.subplot(1,2,2)
-            plt.title("After Center-Based Filtering")
-            plt.imshow(cv2.cvtColor(img_after, cv2.COLOR_BGR2RGB))
-            plt.axis('off')
+        #     plt.subplot(1,2,2)
+        #     plt.title("After Center-Based Filtering")
+        #     plt.imshow(cv2.cvtColor(img_after, cv2.COLOR_BGR2RGB))
+        #     plt.axis('off')
 
-            plt.show()
+        #     plt.show()
 
 
         hull = cv2.convexHull(filtered_points.astype(np.int32))
@@ -696,7 +698,7 @@ def getSquaresFromImage(image_path,debug=False):
         
         return square_images
 
-getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test3.jpg")
+getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test.jpg",debug=True)
 
 
 # Method 3: SIFT + DBSCAN + Color Merging
