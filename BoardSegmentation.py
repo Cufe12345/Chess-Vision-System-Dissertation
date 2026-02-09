@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 from matplotlib import pyplot as plt
 from sklearn.cluster import DBSCAN
+import os
 
 #todo -clean up code and add comments
 
@@ -92,8 +93,34 @@ def getSquaresFromImage(image_path,debug=False):
         # mask = distances < (mean_dist + k * std_dist)
 
         # filtered_points = points[mask]
+        filtered = []
 
-        filtered_points = points
+        for p in points:
+            if not filtered:
+                filtered.append(p)
+                continue
+
+            dists = np.linalg.norm(np.array(filtered) - p, axis=1)
+            if np.all(dists > min_dist):
+                filtered.append(p)
+
+        filtered = np.array(filtered)
+
+        points = filtered
+        center = points.mean(axis=0)
+        cx, cy = int(center[0]), int(center[1])
+
+        distances = np.linalg.norm(points - center, axis=1)
+
+        mean_dist = np.mean(distances)
+        std_dist = np.std(distances)
+
+        k = 1.5  # start with 1.5–2.0
+        mask = distances < (mean_dist + k * std_dist)
+
+        filtered_points = points[mask]
+
+        # filtered_points = filtered
 
         # img_before = img.copy()
         # for x, y in points:
@@ -144,10 +171,12 @@ def getSquaresFromImage(image_path,debug=False):
                 edges,
                 rho=1,
                 theta=np.pi / 180,
-                threshold=100,
-                minLineLength=200,
+                threshold=80,
+                minLineLength=20,
                 maxLineGap=20
         )
+        #changed min line length from 200 to 20
+        #Changed threshold from 100 to 80
 
         if debug:
             plt.figure(figsize=(6,6))
@@ -698,7 +727,65 @@ def getSquaresFromImage(image_path,debug=False):
         
         return square_images
 
-getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test.jpg",debug=True)
+
+# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+
+# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+
+# image_files = [
+#     os.path.join(path_testing, f)
+#     for f in os.listdir(path_testing)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+
+# image_filesO = [
+#     os.path.join(path_opening, f)
+#     for f in os.listdir(path_opening)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+# image_filesM = [
+#     os.path.join(path_midgame, f)
+#     for f in os.listdir(path_midgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+# image_filesE = [
+#     os.path.join(path_endgame, f)
+#     for f in os.listdir(path_endgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+
+# image_files = image_filesO + image_filesM + image_filesE
+
+# offset = 0
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     squares = getSquaresFromImage(image, debug=False)
+
+# folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
+# image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
+
+# image_files = [
+#     os.path.join(folder_path, f)
+#     for f in os.listdir(folder_path)
+#     if f.lower().endswith(image_extensions)
+# ]
+
+# images = []
+# offset = 0
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     squares = getSquaresFromImage(image, debug=False)
+# getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test.jpg",debug=True)
 
 
 # Method 3: SIFT + DBSCAN + Color Merging
