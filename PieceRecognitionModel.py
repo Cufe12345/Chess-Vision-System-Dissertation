@@ -453,5 +453,5 @@ def testModel(model, weight):
     model.evaluate(x_test, y_test)
 
 
-# trainModel()
+trainModel()
 testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
