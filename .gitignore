@@ -12,6 +12,9 @@ __pycache__/
 
 # Files
 **/OutputFENs.txt
+**/training_dataRed.pkl
+**/training_dataZenodo.pkl
+**/training_dataMy.pkl
 
 # Folders
 Experimenting/

@@ -703,19 +703,26 @@ def getSquaresFromImage(image_path,debug=False):
         square_images = []
 
         for sq in squares:
-            sq = sq.astype(int)
+            # sq = sq.astype(int)
 
-            xs = sq[:, 0]
-            ys = sq[:, 1]
+            # xs = sq[:, 0]
+            # ys = sq[:, 1]
 
-            x_min, x_max = xs.min(), xs.max()
-            y_min, y_max = ys.min(), ys.max()
+            # x_min, x_max = xs.min(), xs.max()
+            # y_min, y_max = ys.min(), ys.max()
 
-            square_img = warped[y_min:y_max, x_min:x_max]
+            # square_img = warped[y_min:y_max, x_min:x_max]
 
-            # Optional: make uniform size for all squares
-            square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
+            # # Optional: make uniform size for all squares
+            # square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
 
+            square_img = expand_square_if_piece_outside(sq, warped, margin=5)
+
+            plt.figure(figsize=(4,4))
+            plt.title("Extracted Square")
+            plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.show()
             square_images.append(square_img)
 
         if debug:
@@ -727,6 +734,42 @@ def getSquaresFromImage(image_path,debug=False):
         
         return square_images
 
+
+def expand_square_if_piece_outside(warped, sq, margin=5):
+    """
+    sq: 4 corner points of the square
+    warped: original warped chessboard image
+    margin: extra pixels to add if piece goes outside
+    """
+    sq = sq.astype(int)
+    xs = sq[:, 0]
+    ys = sq[:, 1]
+    x_min, x_max = xs.min(), xs.max()
+    y_min, y_max = ys.min(), ys.max()
+
+    # Crop initial square
+    square_crop = warped[y_min:y_max, x_min:x_max]
+
+    # Convert to grayscale and threshold to detect piece
+    gray = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 30, 255, cv2.THRESH_BINARY_INV)  # pieces are darker
+
+    # Find bounding box of non-zero pixels (the piece)
+    coords = cv2.findNonZero(thresh)
+    if coords is not None:
+        x_piece, y_piece, w_piece, h_piece = cv2.boundingRect(coords)
+
+        # If piece goes beyond current crop, expand
+        x_min_new = max(x_min + x_piece - margin, 0)
+        x_max_new = min(x_min + x_piece + w_piece + margin, warped.shape[1])
+        y_min_new = max(y_min + y_piece - margin, 0)
+        y_max_new = min(y_min + y_piece + h_piece + margin, warped.shape[0])
+
+        square_crop = warped[y_min_new:y_max_new, x_min_new:x_max_new]
+
+    # Resize to uniform size
+    square_crop = cv2.resize(square_crop, (64, 64))
+    return square_crop
 
 # path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
 # path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"

@@ -6,6 +6,8 @@ import albumentations as A
 import tensorflow as tf
 from tensorflow.keras import layers, models 
 import numpy as np
+import pickle
+from sklearn.model_selection import train_test_split
 
 import Visual_Representation
 
@@ -216,7 +218,28 @@ def getTrainingData():
     imagesZenodo = get_zenodoImages()
     print(f"Loaded {len(imagesZenodo)} zenodo images.")
 
+    #save the training data for later use
+    with open("training_dataRed.pkl", "wb") as f:
+        pickle.dump(imagesRed, f)
+    with open("training_dataZenodo.pkl", "wb") as f:
+        pickle.dump(imagesZenodo, f)
+    with open("training_dataMy.pkl", "wb") as f:
+        pickle.dump(imagesMy, f)
     return (imagesRed, imagesZenodo, imagesMy)
+
+def loadTrainingData():
+
+    try:
+        with open("training_dataRed.pkl", "rb") as f:
+            training_dataRed = pickle.load(f)
+        with open("training_dataZenodo.pkl", "rb") as f:
+            training_dataZenodo = pickle.load(f)
+        with open("training_dataMy.pkl", "rb") as f:
+            training_dataMy = pickle.load(f)
+    except FileNotFoundError:
+        getTrainingData()
+        return loadTrainingData()
+    return (training_dataRed, training_dataZenodo, training_dataMy)
 
 def dataPreprocessingRed(data,data_augmentation=False):
     # Placeholder for data preprocessing logic
@@ -224,13 +247,16 @@ def dataPreprocessingRed(data,data_augmentation=False):
     new_data = []
 
     augmentation_pipeline = A.Compose([
-            A.Rotate(limit=10, p=0.5),
+            A.Rotate(limit=5, p=0.3),
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
             A.GaussNoise(std_range=(0.02, 0.08), mean_range=(0.0, 0.0), per_channel=False, noise_scale_factor=1.0, p=0.3),
-            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3)
+            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=10, p=0.5),
+            A.HorizontalFlip(p=0.3),
+            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=10, p=0.3),
         ])
     
-    NUM_AUGMENTATIONS = 3
+    NUM_AUGMENTATIONS = 5
     
     piece_to_int = {
         '': 0,   # empty
@@ -255,6 +281,8 @@ def dataPreprocessingRed(data,data_augmentation=False):
         first = True
         firstAug = True
         for index,sq in enumerate(squares):
+            if labels[index] == '' and np.random.rand() < 0.0:  # Skip some empty squares to balance the dataset
+                continue
             resized_sq = cv2.resize(sq, (64, 64))
             grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
 
@@ -278,6 +306,8 @@ def dataPreprocessingRed(data,data_augmentation=False):
                 
                 count = 0
                 for sq in squares:
+                    if labels[count] == '' and np.random.rand() <1:  # Skip some empty squares to balance the dataset
+                        continue
                     resized_aug = cv2.resize(sq, (64, 64))
                     augmented = augmentation_pipeline(image=resized_aug)['image']
                     grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
@@ -305,13 +335,16 @@ def dataPreprocessingZenodo(data,data_augmentation=False):
     new_data = []
 
     augmentation_pipeline = A.Compose([
-            A.Rotate(limit=10, p=0.5),
+            A.Rotate(limit=5, p=0.3),
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            # A.GaussNoise(std_range=(0.02, 0.08), mean_range=(0.0, 0.0), per_channel=False, noise_scale_factor=1.0, p=0.3),
-            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3)
+            A.GaussNoise(std_range=(0.02, 0.08), mean_range=(0.0, 0.0), per_channel=False, noise_scale_factor=1.0, p=0.3),
+            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=10, p=0.5),
+            A.HorizontalFlip(p=0.3),
+            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=10, p=0.3),
         ])
     
-    NUM_AUGMENTATIONS = 3
+    NUM_AUGMENTATIONS = 5
 
     #Reize images, grey scale, normalise
     for image in data:
@@ -362,7 +395,7 @@ def dataPreprocessingZenodo(data,data_augmentation=False):
                 new_data.append((norm_aug, label))
     
     return new_data
-def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=1024):
+def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
 
     model = models.Sequential([
         layers.Input(shape=(64, 64, 1)),
@@ -399,25 +432,41 @@ def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=1024)
 
     model.summary()
 
+    x_train, x_val, y_train, y_val = train_test_split(
+    x, y,
+    test_size=0.2,
+    stratify=y,
+    random_state=42
+    )
+
+    model.fit(
+        x_train,
+        y_train,
+        validation_data=(x_val, y_val),
+        batch_size=batch_size,
+        epochs=epochs,
+        shuffle=True
+    )
     # Train the model
-    model.fit(x, y, batch_size=batch_size, epochs=epochs, validation_split=0.2, shuffle=True)
+    # model.fit(x, y, batch_size=batch_size, epochs=epochs, validation_split=0.2, shuffle=True)
 
     return model
 
 def trainModel():
     print("Loading training data...")
-    (training_dataRed, training_dataZenodo, training_dataMy) = getTrainingData()
+    # (training_dataRed, training_dataZenodo, training_dataMy) = getTrainingData()
+    (training_dataRed, training_dataZenodo, training_dataMy) = loadTrainingData()
     print(f"Loaded {len(training_dataRed) + len(training_dataZenodo) + len(training_dataMy)} total training samples.")
 
     print("Preprocessing data...")
     preprocessed_dataRed = dataPreprocessingRed(training_dataRed, data_augmentation=True)
-    preprocessed_dataZenodo = dataPreprocessingZenodo(training_dataZenodo, data_augmentation=False)
+    preprocessed_dataZenodo = dataPreprocessingZenodo(training_dataZenodo, data_augmentation=True)
     preprocessed_dataMy = dataPreprocessingRed(training_dataMy, data_augmentation=True)
     print(f"Preprocessed data. Total samples after augmentation: {len(preprocessed_dataRed) + len(preprocessed_dataZenodo) + len(preprocessed_dataMy)}")
     
     print("Getting ready to train the model...")
 
-    all_preprocessed_data = preprocessed_dataRed + preprocessed_dataMy
+    all_preprocessed_data = preprocessed_dataRed + preprocessed_dataMy + preprocessed_dataZenodo
 
     x = []
     y = []
@@ -520,6 +569,6 @@ def visualisePredictions(predicted_labels):
     Visual_Representation.visualize_fen(fen_string)
 
 
-# trainModel()
-# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
-visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\1k6_1P2PK2_8_2bB4_8_8_8_8,b,-,-,0,70.jpg")[0])
+trainModel()
+testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
+visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbq1rk1_ppp1ppbp_5np1_8_2BP1B2_2N1P3_PP3PPP_R2QK1NR,w,-,-,0,1.jpg")[0])
