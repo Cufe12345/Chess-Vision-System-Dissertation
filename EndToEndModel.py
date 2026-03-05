@@ -1,4 +1,5 @@
 import BoardSegmentation
+import Visual_Representation
 import os
 import matplotlib.pyplot as plt
 import cv2
@@ -338,6 +339,73 @@ def testModel(model, weight):
 
     model.evaluate(x_test, y_test)
 
-# trainModel()
-testModel(tf.keras.models.load_model("end_to_end_model.h5"), "end_to_end_weights.h5")
+def labels_to_fen(predicted_labels):
+    fen_rows = []
+    for row in range(8):
+        fen_row = ""
+        empty_count = 0
+        for col in range(8):
+            piece = predicted_labels[row * 8 + col]
+            if piece == '':
+                empty_count += 1
+            else:
+                if empty_count > 0:
+                    fen_row += str(empty_count)
+                    empty_count = 0
+                fen_row += piece
+        if empty_count > 0:
+            fen_row += str(empty_count)
+        fen_rows.append(fen_row)
+    
+    fen_string = "/".join(fen_rows)  # keep top-to-bottom as in your labels
+    return fen_string
+def makePredictions(model, weight, image):
+    model.load_weights(weight)
 
+    preprocessed_image = dataPreprocessingRed([(image, ['']*64)], data_augmentation=False)[0][0]
+    preprocessed_image = np.expand_dims(preprocessed_image, axis=0)  # Add batch dimension
+
+    predictions = model.predict(preprocessed_image)
+    predicted_labels = np.argmax(predictions, axis=-1).flatten()  # Get predicted class indices
+
+    probs = np.max(predictions, axis=-1).flatten() 
+    print(predicted_labels)
+    print(probs)
+    return (predicted_labels,probs)
+def visualisePredictions(predicted_labels):
+    int_to_piece = {
+        0: '',
+        1: 'P',
+        2: 'N',
+        3: 'B',
+        4: 'R',
+        5: 'Q',
+        6: 'K',
+        7: 'p',
+        8: 'n',
+        9: 'b',
+        10: 'r',
+        11: 'q',
+        12: 'k'
+    }
+
+    predicted_pieces = [int_to_piece[label] for label in predicted_labels]
+
+    fen_string = labels_to_fen(predicted_pieces)
+
+
+    print(predicted_pieces)
+    print(fen_string)
+    Visual_Representation.visualize_fen(fen_string)
+# trainModel()
+# testModel(tf.keras.models.load_model("end_to_end_model.h5"), "end_to_end_weights.h5")
+visualisePredictions(makePredictions(tf.keras.models.load_model("end_to_end_model.h5"), "end_to_end_weights.h5", cv2.imread("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\1k6_1P2PK2_8_2bB4_8_8_8_8,b,-,-,0,70.jpg"))[0])
+
+def test():
+    fen = "1k6_1P2PK2_8_2bB4_8_8_8_8,b,-,-,0,70"
+    print(fen)
+    labels = fen_to_labels(fen)
+    print(labels)
+    fen_string = labels_to_fen(labels)
+    print(fen_string)
+# test()

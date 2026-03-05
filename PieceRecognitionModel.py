@@ -7,6 +7,8 @@ import tensorflow as tf
 from tensorflow.keras import layers, models 
 import numpy as np
 
+import Visual_Representation
+
 def recognizePieces(squares):
     
     piece_labels = []
@@ -452,6 +454,72 @@ def testModel(model, weight):
 
     model.evaluate(x_test, y_test)
 
+def labels_to_fen(predicted_labels):
+    fen_rows = []
+    for row in range(8):
+        fen_row = ""
+        empty_count = 0
+        for col in range(8):
+            piece = predicted_labels[row * 8 + col]
+            if piece == '':
+                empty_count += 1
+            else:
+                if empty_count > 0:
+                    fen_row += str(empty_count)
+                    empty_count = 0
+                fen_row += piece
+        if empty_count > 0:
+            fen_row += str(empty_count)
+        fen_rows.append(fen_row)
+    
+    fen_string = "/".join(fen_rows)  # keep top-to-bottom as in your labels
+    return fen_string
 
-trainModel()
-testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
+def makePredictions(model, weight, image):
+    model.load_weights(weight)
+    squares = BoardSegmentation.getSquaresFromImage(image)
+    preprocessed_squares = []
+    for sq in squares:
+        resized_sq = cv2.resize(sq, (64, 64))
+        grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
+        norm_sq = grey_sq / 255.0
+        norm_sq = norm_sq[...,None] # add channel dimension
+        preprocessed_squares.append(norm_sq)
+    preprocessed_squares = np.array(preprocessed_squares)
+    predictions = model.predict(preprocessed_squares)
+    # print(predictions)
+    predicted_labels = np.argmax(predictions, axis=1)
+    probs = np.max(predictions, axis=1)
+    print(predicted_labels)
+    print(probs)
+    return (predicted_labels,probs)
+def visualisePredictions(predicted_labels):
+    int_to_piece = {
+        0: '',
+        1: 'P',
+        2: 'N',
+        3: 'B',
+        4: 'R',
+        5: 'Q',
+        6: 'K',
+        7: 'p',
+        8: 'n',
+        9: 'b',
+        10: 'r',
+        11: 'q',
+        12: 'k'
+    }
+
+    predicted_pieces = [int_to_piece[label] for label in predicted_labels]
+
+    fen_string = labels_to_fen(predicted_pieces)
+
+
+    print(predicted_pieces)
+    print(fen_string)
+    Visual_Representation.visualize_fen(fen_string)
+
+
+# trainModel()
+# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
+visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\1k6_1P2PK2_8_2bB4_8_8_8_8,b,-,-,0,70.jpg")[0])
