@@ -720,11 +720,11 @@ def getSquaresFromImage(image_path,debug=False):
 
             square_img =  expand_square_if_not_empty(model,warped, sq, margin=50)
 
-            plt.figure(figsize=(4,4))
-            plt.title("Extracted Square")
-            plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
-            plt.axis('off')
-            plt.show()
+            # plt.figure(figsize=(4,4))
+            # plt.title("Extracted Square")
+            # plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
+            # plt.axis('off')
+            # plt.show()
             square_images.append(square_img)
 
         if debug:
@@ -776,11 +776,11 @@ def expand_square_if_not_empty(model, warped, sq, margin=2):
     norm_sq = norm_sq[...,None] # add channel dimension
     norm_sq = np.expand_dims(norm_sq, axis=0) 
 
-    pred = model.predict(norm_sq)[0][0]
+    pred = model.predict(norm_sq, verbose=0)[0][0]
 
     # If empty (prediction < 0.5), return original square resized
     if pred < 0.5:
-        print("Square predicted empty, no expansion")
+        # print("Square predicted empty, no expansion")
         return cv2.resize(square_crop, (64, 64))
 
     # --- Occupied → expand using edges ---
@@ -811,46 +811,46 @@ def expand_square_if_not_empty(model, warped, sq, margin=2):
     square_crop = cv2.resize(square_crop, (64, 64))
     return square_crop
 
-path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
 
-path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
-image_files = [
-    os.path.join(path_testing, f)
-    for f in os.listdir(path_testing)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-
-image_filesO = [
-    os.path.join(path_opening, f)
-    for f in os.listdir(path_opening)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesM = [
-    os.path.join(path_midgame, f)
-    for f in os.listdir(path_midgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesE = [
-    os.path.join(path_endgame, f)
-    for f in os.listdir(path_endgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
+# image_files = [
+#     os.path.join(path_testing, f)
+#     for f in os.listdir(path_testing)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
 
-image_files = image_filesO + image_filesM + image_filesE
+# image_filesO = [
+#     os.path.join(path_opening, f)
+#     for f in os.listdir(path_opening)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
-offset = 0
-for i, image in enumerate(image_files):
-    if i < offset:
-        continue
-    print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=False)
+# image_filesM = [
+#     os.path.join(path_midgame, f)
+#     for f in os.listdir(path_midgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+# image_filesE = [
+#     os.path.join(path_endgame, f)
+#     for f in os.listdir(path_endgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+
+# image_files = image_filesO + image_filesM + image_filesE
+
+# offset = 0
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     squares = getSquaresFromImage(image, debug=False)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
