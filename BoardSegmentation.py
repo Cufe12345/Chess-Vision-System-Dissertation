@@ -8,7 +8,7 @@ import tensorflow as tf
 
 #todo -clean up code and add comments
 
-def getSquaresFromImage(image_path,debug=False):
+def getSquaresFromImage(image_path,debug=False,colour=False):
         model = loadBinaryModel("binary_classification_model.h5", "binary_classification_weights.h5")
         img = cv2.imread(image_path)
         h, w = img.shape[:2]
@@ -718,7 +718,7 @@ def getSquaresFromImage(image_path,debug=False):
             # # Optional: make uniform size for all squares
             # square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
 
-            square_img =  expand_square_if_not_empty(model,warped, sq, margin=50)
+            square_img =  expand_square_if_not_empty(model,warped, sq, margin=50,colour=colour)
 
             # plt.figure(figsize=(4,4))
             # plt.title("Extracted Square")
@@ -741,7 +741,7 @@ def loadBinaryModel(model_path,weight_path):
     model.load_weights(weight_path)
     return model
 
-def expand_square_if_not_empty(model, warped, sq, margin=2):
+def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False):
     """
     Uses a binary model to decide if a square is empty. If not, expand the square
     to fully include any piece detected via edge detection.
@@ -808,7 +808,10 @@ def expand_square_if_not_empty(model, warped, sq, margin=2):
         square_crop = warped[y_min_new_clipped:y_max_new_clipped, x_min_new_clipped:x_max_new_clipped]
 
     # Resize to uniform 64x64
-    square_crop = cv2.resize(square_crop, (64, 64))
+    if colour:
+        square_crop = cv2.resize(square_crop, (128, 128))
+    else:
+        square_crop = cv2.resize(square_crop, (64, 64))
     return square_crop
 
 # path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"

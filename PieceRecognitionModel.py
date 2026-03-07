@@ -7,7 +7,9 @@ import tensorflow as tf
 from tensorflow.keras import layers, models 
 import numpy as np
 import pickle
+from tensorflow.keras.applications import DenseNet121
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.applications.densenet import preprocess_input
 
 import Visual_Representation
 
@@ -52,7 +54,7 @@ def fen_to_labels(fen):
     
     return labels
 
-def get_chessRedImages():
+def get_chessRedImages(colour):
     folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
@@ -66,7 +68,7 @@ def get_chessRedImages():
     for i, image in enumerate(image_files):
         # print(f"Processing image {i+1}/{len(image_files)}: {image}")
         try:
-            squares = BoardSegmentation.getSquaresFromImage(image)
+            squares = BoardSegmentation.getSquaresFromImage(image, colour=colour)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
             images.append((squares, labels))
 
@@ -122,7 +124,7 @@ def get_zenodoImages():
     return images
 
 
-def get_myImages():
+def get_myImages(colour):
     path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
     path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
     path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
@@ -152,7 +154,7 @@ def get_myImages():
     for i, image in enumerate(image_files):
         print(f"Processing image {i+1}/{len(image_files)}: {image}")
         try:
-            squares = BoardSegmentation.getSquaresFromImage(image)
+            squares = BoardSegmentation.getSquaresFromImage(image, colour=colour)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
 
             # labels values need remapping as these images are side on
@@ -169,7 +171,7 @@ def get_myImages():
     
     return final_images
 
-def get_testingImages():
+def get_testingImages(colour):
     path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
 
@@ -185,7 +187,7 @@ def get_testingImages():
     for i, image in enumerate(image_files):
         print(f"Processing image {i+1}/{len(image_files)}: {image}")
         try:
-            squares = BoardSegmentation.getSquaresFromImage(image)
+            squares = BoardSegmentation.getSquaresFromImage(image, colour=colour)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
 
             # labels values need remapping as these images are side on
@@ -202,15 +204,15 @@ def get_testingImages():
     
     return final_images
     
-def getTrainingData():
+def getTrainingData(colour):
     # Placeholder for loading and preprocessing training data
 
     print("Loading my images...")
-    imagesMy = get_myImages()
+    imagesMy = get_myImages(colour)
     print(f"Loaded {len(imagesMy)} of my images.")
     
     print("Loading chessRed images...")
-    imagesRed = get_chessRedImages()
+    imagesRed = get_chessRedImages(colour)
     # imagesRed = []
     print(f"Loaded {len(imagesRed)} chessRed images.")
 
@@ -227,7 +229,7 @@ def getTrainingData():
         pickle.dump(imagesMy, f)
     return (imagesRed, imagesZenodo, imagesMy)
 
-def loadTrainingData():
+def loadTrainingData(colour):
 
     try:
         with open("training_dataRed.pkl", "rb") as f:
@@ -237,24 +239,26 @@ def loadTrainingData():
         with open("training_dataMy.pkl", "rb") as f:
             training_dataMy = pickle.load(f)
     except FileNotFoundError:
-        getTrainingData()
-        return loadTrainingData()
+        getTrainingData(colour)
+        return loadTrainingData(colour)
     return (training_dataRed, training_dataZenodo, training_dataMy)
 
-def dataPreprocessingRed(data,data_augmentation=False):
+def dataPreprocessingRed(data,data_augmentation=False,colour=False):
     # Placeholder for data preprocessing logic
 
     new_data = []
 
     augmentation_pipeline = A.Compose([
-            A.Rotate(limit=5, p=0.3),
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            A.GaussNoise(std_range=(0.02, 0.08), mean_range=(0.0, 0.0), per_channel=False, noise_scale_factor=1.0, p=0.3),
-            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3),
-            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=10, p=0.5),
-            A.HorizontalFlip(p=0.3),
-            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=10, p=0.3),
-        ])
+    A.Rotate(limit=5, p=0.3),
+    A.RandomBrightnessContrast(p=0.3),
+    A.GaussNoise(p=0.2),
+    A.ShiftScaleRotate(
+        shift_limit=0.05,
+        scale_limit=0.05,
+        rotate_limit=5,
+        p=0.3
+    )
+])
     
     NUM_AUGMENTATIONS = 5
     
@@ -283,8 +287,14 @@ def dataPreprocessingRed(data,data_augmentation=False):
         for index,sq in enumerate(squares):
             if labels[index] == '' and np.random.rand() < 0.0:  # Skip some empty squares to balance the dataset
                 continue
-            resized_sq = cv2.resize(sq, (64, 64))
-            grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
+            resized_sq = sq
+            if colour:
+                resized_sq = cv2.resize(sq, (128, 128))
+            else:
+                resized_sq = cv2.resize(sq, (64, 64))
+            grey_sq = resized_sq
+            if not colour:
+                grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
 
             # if first:
             #     plt.imshow(grey_sq, cmap='gray')
@@ -297,8 +307,10 @@ def dataPreprocessingRed(data,data_augmentation=False):
             #     plt.title(f"Label: {labels[index]}")
             #     plt.axis('off')
             #     plt.show()
-            norm_sq = grey_sq / 255.0
-            norm_sq = norm_sq[...,None] # add channel dimension
+            norm_sq = grey_sq
+            if not colour:
+                norm_sq = norm_sq / 255.0
+                norm_sq = norm_sq[...,None] # add channel dimension
             new_data.append((norm_sq, piece_to_int[labels[index]]))
 
         if data_augmentation:
@@ -308,9 +320,15 @@ def dataPreprocessingRed(data,data_augmentation=False):
                 for sq in squares:
                     if labels[count] == '' and np.random.rand() <1:  # Skip some empty squares to balance the dataset
                         continue
-                    resized_aug = cv2.resize(sq, (64, 64))
+                    resized_aug = sq
+                    if colour:
+                        resized_aug = cv2.resize(sq, (128, 128))
+                    else:    
+                        resized_aug = cv2.resize(sq, (64, 64))
                     augmented = augmentation_pipeline(image=resized_aug)['image']
-                    grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
+                    grey_aug = augmented
+                    if not colour:
+                        grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
                     # if firstAug:
                     #     plt.imshow(grey_aug, cmap='gray')
                     #     plt.title(f"Augmented Label: {labels[count]}")
@@ -322,35 +340,45 @@ def dataPreprocessingRed(data,data_augmentation=False):
                     #     plt.title(f"Label: {labels[count]} (Augmented)")
                     #     plt.axis('off')
                     #     plt.show()
-                    norm_aug = grey_aug / 255.0
-                    norm_aug = norm_aug[...,None] # add channel dimension
+                    norm_aug = grey_aug
+                    if not colour:
+                        norm_aug = norm_aug / 255.0
+                        norm_aug = norm_aug[...,None] # add channel dimension
                     new_data.append((norm_aug, piece_to_int[labels[count]]))
                     count += 1
     
     return new_data
 
-def dataPreprocessingZenodo(data,data_augmentation=False):
+def dataPreprocessingZenodo(data,data_augmentation=False,colour=False):
     # Placeholder for data preprocessing logic
 
     new_data = []
 
     augmentation_pipeline = A.Compose([
-            A.Rotate(limit=5, p=0.3),
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            A.GaussNoise(std_range=(0.02, 0.08), mean_range=(0.0, 0.0), per_channel=False, noise_scale_factor=1.0, p=0.3),
-            A.CoarseDropout(num_holes_range=(1,1), hole_height_range=(5,8), hole_width_range=(5,8), fill=0, p=0.3),
-            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=10, p=0.5),
-            A.HorizontalFlip(p=0.3),
-            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=15, val_shift_limit=10, p=0.3),
-        ])
+    A.Rotate(limit=5, p=0.3),
+    A.RandomBrightnessContrast(p=0.3),
+    A.GaussNoise(p=0.2),
+    A.ShiftScaleRotate(
+        shift_limit=0.05,
+        scale_limit=0.05,
+        rotate_limit=5,
+        p=0.3
+    )
+])
     
     NUM_AUGMENTATIONS = 5
 
     #Reize images, grey scale, normalise
     for image in data:
         square, label = image
-        resized_sq = cv2.resize(square, (64, 64))
-        grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
+        resized_sq = square
+        if colour:
+                resized_sq = cv2.resize(square, (128, 128))
+        else:
+            resized_sq = cv2.resize(square, (64, 64))
+        grey_sq = resized_sq
+        if not colour:
+            grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
 
         # plt.imshow(grey_sq, cmap='gray')
         # plt.title(f"Label: {label}")
@@ -367,17 +395,24 @@ def dataPreprocessingZenodo(data,data_augmentation=False):
             #     plt.title(f"Label: {labels[index]}")
             #     plt.axis('off')
             #     plt.show()
-        norm_sq = grey_sq / 255.0
-        norm_sq = norm_sq[...,None] # add channel dimension
+        norm_sq = grey_sq
+        if not colour:
+            norm_sq = norm_sq / 255.0
+            norm_sq = norm_sq[...,None] # add channel dimension
         new_data.append((norm_sq, label))
 
         if data_augmentation:
             for _ in range(NUM_AUGMENTATIONS):
                 
-                
-                resized_aug = cv2.resize(square, (64, 64))
+                resized_aug = square
+                if colour:
+                    resized_aug = cv2.resize(square, (128, 128))
+                else:
+                    resized_aug = cv2.resize(square, (64, 64))
                 augmented = augmentation_pipeline(image=resized_aug)['image']
-                grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
+                grey_aug = augmented
+                if not colour:
+                    grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
                     # if firstAug:
                 # if label != "0":
                 #     plt.imshow(grey_aug, cmap='gray')
@@ -390,11 +425,69 @@ def dataPreprocessingZenodo(data,data_augmentation=False):
                     #     plt.title(f"Label: {labels[count]} (Augmented)")
                     #     plt.axis('off')
                     #     plt.show()
-                norm_aug = grey_aug / 255.0
-                norm_aug = norm_aug[...,None] # add channel dimension
+                norm_aug = grey_aug
+                if not colour:
+                    norm_aug = norm_aug / 255.0
+                    norm_aug = norm_aug[...,None] # add channel dimension
                 new_data.append((norm_aug, label))
     
     return new_data
+
+def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32):
+    x = preprocess_input(x)
+    base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+    base_model.trainable = False  # freeze for initial training
+    model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.BatchNormalization(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(num_classes, activation='softmax')
+    ])
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.summary()
+    x_train, x_val, y_train, y_val = train_test_split(
+    x, y,
+    test_size=0.2,
+    stratify=y,
+    random_state=42
+    )
+
+    model.fit(
+        x_train,
+        y_train,
+        validation_data=(x_val, y_val),
+        batch_size=batch_size,
+        epochs=epochs,
+        shuffle=True
+    )
+
+    print("Unfreezing base model for fine-tuning...")
+    base_model.trainable = True
+
+    for layer in base_model.layers[:-40]:  # Freeze all but last 40 layers
+        layer.trainable = False
+    
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    x_train, x_val, y_train, y_val = train_test_split(
+    x, y,
+    test_size=0.2,
+    stratify=y,
+    random_state=42
+    )
+
+    model.fit(
+        x_train,
+        y_train,
+        validation_data=(x_val, y_val),
+        batch_size=batch_size,
+        epochs=epochs,
+        shuffle=True
+    )
+    return model
+
 def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
 
     model = models.Sequential([
@@ -452,16 +545,16 @@ def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
 
     return model
 
-def trainModel():
+def trainModel(color=False):
     print("Loading training data...")
     # (training_dataRed, training_dataZenodo, training_dataMy) = getTrainingData()
-    (training_dataRed, training_dataZenodo, training_dataMy) = loadTrainingData()
+    (training_dataRed, training_dataZenodo, training_dataMy) = loadTrainingData(color)
     print(f"Loaded {len(training_dataRed) + len(training_dataZenodo) + len(training_dataMy)} total training samples.")
 
     print("Preprocessing data...")
-    preprocessed_dataRed = dataPreprocessingRed(training_dataRed, data_augmentation=True)
-    preprocessed_dataZenodo = dataPreprocessingZenodo(training_dataZenodo, data_augmentation=True)
-    preprocessed_dataMy = dataPreprocessingRed(training_dataMy, data_augmentation=True)
+    preprocessed_dataRed = dataPreprocessingRed(training_dataRed, data_augmentation=True,colour=color)
+    preprocessed_dataZenodo = dataPreprocessingZenodo(training_dataZenodo, data_augmentation=True,colour=color)
+    preprocessed_dataMy = dataPreprocessingRed(training_dataMy, data_augmentation=True,colour=color)
     print(f"Preprocessed data. Total samples after augmentation: {len(preprocessed_dataRed) + len(preprocessed_dataZenodo) + len(preprocessed_dataMy)}")
     
     print("Getting ready to train the model...")
@@ -481,26 +574,33 @@ def trainModel():
 
     # Convert to numpy arrays
     x = np.array(x, dtype="float32")
+    print(x.shape)
     y = np.array(y, dtype="int32")
     print(np.unique(y))
     print(y[:20])
-    model = trainPieceRecognitionModel(x,y)
+    print(x.nbytes / 1e9, "GB")
+    if not color:
+        model = trainPieceRecognitionModel(x,y)
+    else:
+        model = denseNetPieceRecognitionModel(x,y)
     model.save("piece_recognition_model.h5")
     model.save_weights("piece_recognition_weights.h5")
 
     # testModel(model)
 
-def testModel(model, weight):
+def testModel(model, weight, color=False):
     model.load_weights(weight)
 
-    test_data = get_testingImages()
-    test_data = dataPreprocessingRed(test_data, data_augmentation=False)
+    test_data = get_testingImages(colour=color)
+    test_data = dataPreprocessingRed(test_data, data_augmentation=False, colour=color)
 
     x_test, y_test = zip(*test_data)
 
     x_test = np.array(x_test)
     y_test = np.array(y_test)
 
+    if color:
+        x_test = preprocess_input(x_test)
     model.evaluate(x_test, y_test)
 
 def labels_to_fen(predicted_labels):
@@ -524,17 +624,28 @@ def labels_to_fen(predicted_labels):
     fen_string = "/".join(fen_rows)  # keep top-to-bottom as in your labels
     return fen_string
 
-def makePredictions(model, weight, image):
+def makePredictions(model, weight, image, color=False):
     model.load_weights(weight)
-    squares = BoardSegmentation.getSquaresFromImage(image)
+    squares = BoardSegmentation.getSquaresFromImage(image,colour=color)
     preprocessed_squares = []
     for sq in squares:
-        resized_sq = cv2.resize(sq, (64, 64))
-        grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
-        norm_sq = grey_sq / 255.0
-        norm_sq = norm_sq[...,None] # add channel dimension
+        resized_sq = sq
+        if color:
+            resized_sq = cv2.resize(sq, (128, 128))
+        else:
+            resized_sq = cv2.resize(sq, (64, 64))
+        grey_sq = resized_sq
+        if not color:
+            grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
+        norm_sq = grey_sq
+
+        if not color:
+            norm_sq = norm_sq / 255.0
+            norm_sq = norm_sq[...,None] # add channel dimension
         preprocessed_squares.append(norm_sq)
     preprocessed_squares = np.array(preprocessed_squares)
+    if color:
+        preprocessed_squares = preprocess_input(preprocessed_squares)
     predictions = model.predict(preprocessed_squares)
     # print(predictions)
     predicted_labels = np.argmax(predictions, axis=1)
@@ -569,6 +680,6 @@ def visualisePredictions(predicted_labels):
     Visual_Representation.visualize_fen(fen_string)
 
 
-# trainModel()
-# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5")
-visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\1k6_1P2PK2_8_2bB4_8_8_8_8,b,-,-,0,70.jpg")[0])
+# trainModel(True)
+# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbq1rk1_ppp1ppbp_5np1_8_2BP1B2_2N1P3_PP3PPP_R2QK1NR,w,-,-,0,1.jpg", color=True)[0])
