@@ -607,7 +607,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             x1,y1,x2,y2 = l
             return np.arctan2(y2-y1, x2-x1)
 
-        def select_best_9_spacing(lines, axis='x', img_size=None, n_slices=10):
+        def select_best_9_spacing(lines, axis='x', img_size=None, angle_tol_deg=10):
             """
             Select the best 9 lines based on spacing uniformity.
             lines: list of lines (x1,y1,x2,y2)
@@ -619,7 +619,6 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
 
             h_img, w_img = warped.shape[:2]
 
-            # slices for sampling intersections
             if axis == 'x':
                 slices = [0.1*h_img, 0.5*h_img, 0.9*h_img]
             else:
@@ -629,46 +628,40 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             angles = []
             lines_valid = []
 
-            def line_angle(line):
-                x1, y1, x2, y2 = line
-                return math.atan2(y2 - y1, x2 - x1)
-
             for l in lines:
 
                 x1, y1, x2, y2 = l
                 coords = []
 
-                if axis == 'x':  # vertical lines
+                if axis == 'x':
 
                     if abs(y2 - y1) < 1e-6:
                         continue
 
                     for y in slices:
-
                         t = (y - y1) / (y2 - y1)
 
                         if 0 <= t <= 1:
                             x = x1 + t * (x2 - x1)
                             coords.append(x)
 
-                else:  # horizontal lines
+                else:
 
                     if abs(x2 - x1) < 1e-6:
                         continue
 
                     for x in slices:
-
                         t = (x - x1) / (x2 - x1)
 
                         if 0 <= t <= 1:
                             y = y1 + t * (y2 - y1)
                             coords.append(y)
 
-                if len(coords) == 0:
+                if not coords:
                     continue
 
                 positions.append(np.mean(coords))
-                angles.append(line_angle(l))
+                angles.append(math.atan2(y2 - y1, x2 - x1))
                 lines_valid.append(l)
 
             if len(lines_valid) < 9:
@@ -677,7 +670,20 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             positions = np.array(positions)
             angles = np.array(angles)
 
-            # sort lines by position
+            # --- ANGLE PRUNING ---
+            median_angle = np.median(angles)
+            angle_tol = np.deg2rad(angle_tol_deg)
+
+            mask = np.abs(angles - median_angle) < angle_tol
+
+            positions = positions[mask]
+            angles = angles[mask]
+            lines_valid = [l for l, m in zip(lines_valid, mask) if m]
+
+            if len(lines_valid) < 9:
+                return None
+
+            # sort by position
             order = np.argsort(positions)
 
             positions = positions[order]
@@ -694,8 +700,9 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
 
                 diffs = np.diff(combo_positions)
 
-                spacing_std = np.std(diffs)
                 spacing_mean = np.mean(diffs)
+                spacing_std = np.std(diffs)
+
                 total_span = combo_positions[-1] - combo_positions[0]
 
                 if spacing_mean < 10:
@@ -706,7 +713,6 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
 
                 angle_std = np.std(combo_angles)
 
-                # combined score
                 score = spacing_std + 200 * angle_std
 
                 if score < best_score:
@@ -904,12 +910,12 @@ image_filesE = [
 
 image_files = image_filesO + image_filesM + image_filesE
 
-offset = 16
+offset = 0
 for i, image in enumerate(image_files):
     if i < offset:
         continue
     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=True,colour=True)
+    squares = getSquaresFromImage(image, debug=False,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
