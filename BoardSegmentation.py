@@ -1,3 +1,5 @@
+import math
+
 import cv2
 import numpy as np
 import itertools
@@ -605,7 +607,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             x1,y1,x2,y2 = l
             return np.arctan2(y2-y1, x2-x1)
 
-        def select_best_9_spacing(lines, axis='x', img_size=None):
+        def select_best_9_spacing(lines, axis='x', img_size=None, n_slices=10):
             """
             Select the best 9 lines based on spacing uniformity.
             lines: list of lines (x1,y1,x2,y2)
@@ -615,67 +617,100 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             if len(lines) < 9:
                 return None
 
-
-            # get a reference point (center of warped board)
             h_img, w_img = warped.shape[:2]
-            x_ref = w_img / 2
-            y_ref = h_img / 2
 
-            # --- NEW: compute stable 1D position per line ---
+            # slices for sampling intersections
+            if axis == 'x':
+                slices = [0.1*h_img, 0.5*h_img, 0.9*h_img]
+            else:
+                slices = [0.1*w_img, 0.5*w_img, 0.9*w_img]
+
             positions = []
+            angles = []
             lines_valid = []
 
-            if axis == 'x':
-                # vertical lines → x at y = y_ref
-                for l in lines:
-                    x1, y1, x2, y2 = l
+            def line_angle(line):
+                x1, y1, x2, y2 = line
+                return math.atan2(y2 - y1, x2 - x1)
+
+            for l in lines:
+
+                x1, y1, x2, y2 = l
+                coords = []
+
+                if axis == 'x':  # vertical lines
+
                     if abs(y2 - y1) < 1e-6:
                         continue
-                    t = (y_ref - y1) / (y2 - y1)
-                    x = x1 + t * (x2 - x1)
-                    positions.append(x)
-                    lines_valid.append(l)
-            else:
-                # horizontal lines → y at x = x_ref
-                for l in lines:
-                    x1, y1, x2, y2 = l
+
+                    for y in slices:
+
+                        t = (y - y1) / (y2 - y1)
+
+                        if 0 <= t <= 1:
+                            x = x1 + t * (x2 - x1)
+                            coords.append(x)
+
+                else:  # horizontal lines
+
                     if abs(x2 - x1) < 1e-6:
                         continue
-                    t = (x_ref - x1) / (x2 - x1)
-                    y = y1 + t * (y2 - y1)
-                    positions.append(y)
-                    lines_valid.append(l)
-            
+
+                    for x in slices:
+
+                        t = (x - x1) / (x2 - x1)
+
+                        if 0 <= t <= 1:
+                            y = y1 + t * (y2 - y1)
+                            coords.append(y)
+
+                if len(coords) == 0:
+                    continue
+
+                positions.append(np.mean(coords))
+                angles.append(line_angle(l))
+                lines_valid.append(l)
+
             if len(lines_valid) < 9:
                 return None
 
-
             positions = np.array(positions)
+            angles = np.array(angles)
 
-            # Sort by computed position
+            # sort lines by position
             order = np.argsort(positions)
+
             positions = positions[order]
+            angles = angles[order]
             lines_sorted = [lines_valid[i] for i in order]
 
-            best_std = np.inf
+            best_score = np.inf
             best_group = None
 
-            # Iterate over all combinations of 9 lines
             for combo_indices in itertools.combinations(range(len(lines_sorted)), 9):
+
                 combo_positions = positions[list(combo_indices)]
+                combo_angles = angles[list(combo_indices)]
+
                 diffs = np.diff(combo_positions)
+
                 spacing_std = np.std(diffs)
                 spacing_mean = np.mean(diffs)
                 total_span = combo_positions[-1] - combo_positions[0]
 
-                # Optional: reject combos with tiny spacing or too short total span
                 if spacing_mean < 10:
                     continue
+
                 if img_size is not None and total_span < 0.3 * img_size:
                     continue
 
-                if spacing_std < best_std:
-                    best_std = spacing_std
+                angle_std = np.std(combo_angles)
+
+                # combined score
+                score = spacing_std + 150 * angle_std
+
+                if score < best_score:
+                    best_score = score
                     best_group = [lines_sorted[i] for i in combo_indices]
 
             return best_group
@@ -869,12 +904,12 @@ image_filesE = [
 
 image_files = image_filesO + image_filesM + image_filesE
 
-offset = 3
+offset = 0
 for i, image in enumerate(image_files):
     if i < offset:
         continue
     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=True,colour=True)
+    squares = getSquaresFromImage(image, debug=False,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
