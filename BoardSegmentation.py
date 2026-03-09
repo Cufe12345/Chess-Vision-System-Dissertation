@@ -166,7 +166,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
 
         roi = cv2.bitwise_and(img, img, mask=mask)
 
-        gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        gray_roi = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray_roi, 50, 150, apertureSize=3)
 
         lines = cv2.HoughLinesP(
@@ -174,7 +174,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
                 rho=1,
                 theta=np.pi / 180,
                 threshold=80,
-                minLineLength=20,
+                minLineLength=40,
                 maxLineGap=20
         )
         #changed min line length from 200 to 20
@@ -529,8 +529,18 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             y_top, y_bottom: vertical bounds
             Returns clipped line (x1, y_top, x2, y_bottom)
             """
+
             x1, y1, x2, y2 = line
-            return (x1, y_top, x2, y_bottom)
+
+            if y2 == y1:
+                return line  # avoid division by zero
+
+            m = (x2 - x1) / (y2 - y1)  # dx/dy since we're solving for x
+
+            x_top = x1 + (y_top - y1) * m
+            x_bottom = x1 + (y_bottom - y1) * m
+
+            return (int(x_top), int(y_top), int(x_bottom), int(y_bottom))
 
         def clip_horizontal_line(line, x_left, x_right):
             """
@@ -539,13 +549,24 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             Returns clipped line (x_left, y1, x_right, y2)
             """
             x1, y1, x2, y2 = line
-            return (x_left, y1, x_right, y2)
+
+            if x2 == x1:
+                return line
+
+            m = (y2 - y1) / (x2 - x1)
+
+            y_left = y1 + (x_left - x1) * m
+            y_right = y1 + (x_right - x1) * m
+
+            return (int(x_left), int(y_left), int(x_right), int(y_right))
 
         y_top = min((l[1] + l[3])/2 for l in h_lines_ext)
         y_bottom = max((l[1] + l[3])/2 for l in h_lines_ext)
 
         x_left = min((l[0] + l[2])/2 for l in v_lines_ext)
         x_right = max((l[0] + l[2])/2 for l in v_lines_ext)
+
+        print(f"Clipping bounds: y_top={y_top}, y_bottom={y_bottom}, x_left={x_left}, x_right={x_right}")
 
         v_lines_clipped = [clip_vertical_line(l, y_top, y_bottom) for l in v_lines_ext]
         h_lines_clipped = [clip_horizontal_line(l, x_left, x_right) for l in h_lines_ext]
@@ -727,7 +748,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             # plt.show()
             square_images.append(square_img)
 
-        if debug:
+        if not debug:
             plt.figure(figsize=(6,6))
             plt.title("Detected Chessboard Squares")
             plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
@@ -814,46 +835,46 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False):
         square_crop = cv2.resize(square_crop, (64, 64))
     return square_crop
 
-# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
 
-# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
-# image_files = [
-#     os.path.join(path_testing, f)
-#     for f in os.listdir(path_testing)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
-
-
-# image_filesO = [
-#     os.path.join(path_opening, f)
-#     for f in os.listdir(path_opening)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
-
-# image_filesM = [
-#     os.path.join(path_midgame, f)
-#     for f in os.listdir(path_midgame)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
-
-# image_filesE = [
-#     os.path.join(path_endgame, f)
-#     for f in os.listdir(path_endgame)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
+image_files = [
+    os.path.join(path_testing, f)
+    for f in os.listdir(path_testing)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
 
-# image_files = image_filesO + image_filesM + image_filesE
+image_filesO = [
+    os.path.join(path_opening, f)
+    for f in os.listdir(path_opening)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
-# offset = 0
-# for i, image in enumerate(image_files):
-#     if i < offset:
-#         continue
-#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-#     squares = getSquaresFromImage(image, debug=False)
+image_filesM = [
+    os.path.join(path_midgame, f)
+    for f in os.listdir(path_midgame)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
+
+image_filesE = [
+    os.path.join(path_endgame, f)
+    for f in os.listdir(path_endgame)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
+
+
+image_files = image_filesO + image_filesM + image_filesE
+
+offset = 3
+for i, image in enumerate(image_files):
+    if i < offset:
+        continue
+    print(f"Processing image {i+1}/{len(image_files)}: {image}")
+    squares = getSquaresFromImage(image, debug=True,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")

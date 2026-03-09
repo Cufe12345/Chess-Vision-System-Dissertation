@@ -433,7 +433,7 @@ def dataPreprocessingZenodo(data,data_augmentation=False,colour=False):
     
     return new_data
 
-def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32):
+def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32,sample_weights=None):
     x = preprocess_input(x)
     base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
     base_model.trainable = False  # freeze for initial training
@@ -448,12 +448,18 @@ def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32
 
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    x_train, x_val, y_train, y_val = train_test_split(
-    x, y,
+    indices = np.arange(len(x))
+    train_idx, val_idx = train_test_split(
+    indices,
     test_size=0.2,
     stratify=y,
     random_state=42
     )
+
+    x_train, y_train = x[train_idx], y[train_idx]
+    x_val, y_val = x[val_idx], y[val_idx]
+
+    sw_train,sw_val = sample_weights[train_idx], sample_weights[val_idx]
 
     model.fit(
         x_train,
@@ -461,31 +467,32 @@ def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32
         validation_data=(x_val, y_val),
         batch_size=batch_size,
         epochs=epochs,
-        shuffle=True
+        shuffle=True,
+        sample_weight=sw_train
     )
 
-    print("Unfreezing base model for fine-tuning...")
-    base_model.trainable = True
+    # print("Unfreezing base model for fine-tuning...")
+    # base_model.trainable = True
 
-    for layer in base_model.layers[:-40]:  # Freeze all but last 40 layers
-        layer.trainable = False
+    # for layer in base_model.layers[:-40]:  # Freeze all but last 40 layers
+    #     layer.trainable = False
     
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    x_train, x_val, y_train, y_val = train_test_split(
-    x, y,
-    test_size=0.2,
-    stratify=y,
-    random_state=42
-    )
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # x_train, x_val, y_train, y_val = train_test_split(
+    # x, y,
+    # test_size=0.2,
+    # stratify=y,
+    # random_state=42
+    # )
 
-    model.fit(
-        x_train,
-        y_train,
-        validation_data=(x_val, y_val),
-        batch_size=batch_size,
-        epochs=epochs,
-        shuffle=True
-    )
+    # model.fit(
+    #     x_train,
+    #     y_train,
+    #     validation_data=(x_val, y_val),
+    #     batch_size=batch_size,
+    #     epochs=epochs,
+    #     shuffle=True
+    # )
     return model
 
 def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
@@ -559,14 +566,21 @@ def trainModel(color=False):
     
     print("Getting ready to train the model...")
 
-    all_preprocessed_data = preprocessed_dataRed + preprocessed_dataMy + preprocessed_dataZenodo
+    all_preprocessed_data = preprocessed_dataRed + preprocessed_dataZenodo
 
     x = []
     y = []
+    sample_weights = []
 
     for square, label in all_preprocessed_data:
         x.append(square)
         y.append(label)
+        sample_weights.append(1.0)
+    
+    for square, label in preprocessed_dataMy:
+        x.append(square)
+        y.append(label)
+        sample_weights.append(3.0)  # Give more weight to my images to help the model generalize better to them
 
     print(np.unique(y))
     print(y[:20])
@@ -576,13 +590,14 @@ def trainModel(color=False):
     x = np.array(x, dtype="float32")
     print(x.shape)
     y = np.array(y, dtype="int32")
+    sample_weights = np.array(sample_weights, dtype="float32")
     print(np.unique(y))
     print(y[:20])
     print(x.nbytes / 1e9, "GB")
     if not color:
         model = trainPieceRecognitionModel(x,y)
     else:
-        model = denseNetPieceRecognitionModel(x,y)
+        model = denseNetPieceRecognitionModel(x,y,sample_weights=sample_weights)
     model.save("piece_recognition_model.h5")
     model.save_weights("piece_recognition_weights.h5")
 
@@ -680,6 +695,6 @@ def visualisePredictions(predicted_labels):
     Visual_Representation.visualize_fen(fen_string)
 
 
-# trainModel(True)
-# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+trainModel(True)
+testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
 visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbq1rk1_ppp1ppbp_5np1_8_2BP1B2_2N1P3_PP3PPP_R2QK1NR,w,-,-,0,1.jpg", color=True)[0])

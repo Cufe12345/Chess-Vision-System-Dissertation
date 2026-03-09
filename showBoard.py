@@ -2,6 +2,7 @@ import chess
 import random
 import cv2
 import os
+import Visual_Representation
 def print_ascii(fen):
     board = chess.Board(fen)
     print(board)   # python-chess prints a nice ASCII board
@@ -21,7 +22,7 @@ def cameraSetup():
     return cam
 
 def FEN_To_Filename(fen):
-    return fen.replace("/", "_").replace(" ", "_")
+    return fen.replace("/", "_").replace(" ", ",")
 
 def Filename_To_FEN(filename):
     return filename.replace("_", "/").replace(",", " ")
@@ -102,6 +103,7 @@ while True:
     print(f"Game State: {state}")
     if state == "endgame":
         print_ascii(fen)
+        Visual_Representation.visualize_fen(fen)
         option = input("Press 's' to skip or anything else to capture image...")
         if(option.lower() != 's'):
             captureBoardImage(camera, fen)
