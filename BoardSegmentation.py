@@ -707,7 +707,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
                 angle_std = np.std(combo_angles)
 
                 # combined score
-                score = spacing_std + 150 * angle_std
+                score = spacing_std + 200 * angle_std
 
                 if score < best_score:
                     best_score = score
@@ -904,12 +904,12 @@ image_filesE = [
 
 image_files = image_filesO + image_filesM + image_filesE
 
-offset = 0
+offset = 16
 for i, image in enumerate(image_files):
     if i < offset:
         continue
     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=False,colour=True)
+    squares = getSquaresFromImage(image, debug=True,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
