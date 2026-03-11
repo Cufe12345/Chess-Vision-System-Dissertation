@@ -815,7 +815,7 @@ def trainPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epoch
 
     return model
 
-augmentation_pipeline = A.Compose([
+augmentation_pipeline_128 = A.Compose([
     A.Rotate(limit=5, p=0.3),
     A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
     A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
@@ -826,13 +826,26 @@ augmentation_pipeline = A.Compose([
     A.Perspective(scale=(0.02, 0.05), p=0.25),
     A.RandomResizedCrop(size=(128,128), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
 ])
+augmentation_pipeline_64 = A.Compose([
+    A.Rotate(limit=5, p=0.3),
+    A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
+    A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
+    A.GaussNoise(std_range=(0.05, 0.1), p=0.2),
+    A.ImageCompression(quality_range=(60, 100), p=0.3),
+    A.GaussianBlur(blur_limit=(3,5), p=0.2),
+    A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
+    A.Perspective(scale=(0.02, 0.05), p=0.25),
+    A.RandomResizedCrop(size=(64,64), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
+])
 def augment_numpy(img,colour):
     img = img.numpy()
     colour = bool(colour.numpy())
     img = img.astype(np.uint8)
-    augmented = augmentation_pipeline(image=img)["image"]
-    if not colour:
-                augmented = augmented / 255.0
+    if colour:
+        augmented = augmentation_pipeline_128(image=img)["image"]
+    else:
+        augmented = augmentation_pipeline_64(image=img)["image"]
+        augmented = augmented / 255.0
     return augmented.astype(np.float32)
 def augment_tf(img,colour):
     img = tf.py_function(
@@ -851,10 +864,15 @@ def loadImage(path,label,augmentation=False,colour=False):
         img = tf.image.decode_png(img, channels=1)
     if augmentation:
         img = augment_tf(img,colour)
-
-    img = tf.image.convert_image_dtype(img, tf.float32)
+    else:
+        img = tf.cast(img, tf.float32)
+    #write file to check if augmentation is working
+    tf.io.write_file(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\inspection\\augmented_test_{augmentation}.png", tf.image.encode_png(tf.cast(img*255, tf.uint8)))
+    # img = tf.image.convert_image_dtype(img, tf.float32)
     if colour:
         img = preprocess_input(img)
+    else:
+        img = img / 255.0
     return img, label
 def trainModel(color=False):
     print("Loading training data...")
@@ -1046,4 +1064,4 @@ def visualisePredictions(predicted_labels):
 
 # trainModel(True)
 # testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
-visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbq1rk1_ppp1ppbp_5np1_8_2BP1B2_2N1P3_PP3PPP_R2QK1NR,w,-,-,0,1.jpg", color=True)[0])
+visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\r5k1_pp5p_2pp4_4p3_nPP3p1_4P1P1_P1P5_3R1NK1,b,-,-,0,23.jpg", color=True)[0])
