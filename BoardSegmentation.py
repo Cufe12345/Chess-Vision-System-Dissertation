@@ -10,7 +10,7 @@ import tensorflow as tf
 
 #todo -clean up code and add comments
 
-def getSquaresFromImage(image_path,debug=False,colour=False):
+def getSquaresFromImage(image_path,debug=False,colour=False,farChessTable=False):
         model = loadBinaryModel("binary_classification_model.h5", "binary_classification_weights.h5")
         img = cv2.imread(image_path)
         h, w = img.shape[:2]
@@ -168,7 +168,10 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
 
         roi = cv2.bitwise_and(img, img, mask=mask)
 
-        gray_roi = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if farChessTable:
+            gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_roi = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray_roi, 50, 150, apertureSize=3)
 
         lines = cv2.HoughLinesP(
@@ -607,7 +610,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             x1,y1,x2,y2 = l
             return np.arctan2(y2-y1, x2-x1)
 
-        def select_best_9_spacing(lines, axis='x', img_size=None, angle_tol_deg=10):
+        def select_best_9_spacing(lines, axis='x', img_size=None, angle_tol_deg=20):
             """
             Select the best 9 lines based on spacing uniformity.
             lines: list of lines (x1,y1,x2,y2)
@@ -780,7 +783,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             # # Optional: make uniform size for all squares
             # square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
 
-            square_img =  expand_square_if_not_empty(model,warped, sq, margin=50,colour=colour)
+            square_img =  expand_square_if_not_empty(model,warped, sq, margin=50,colour=colour,farChessTable=farChessTable)
 
             # plt.figure(figsize=(4,4))
             # plt.title("Extracted Square")
@@ -789,7 +792,7 @@ def getSquaresFromImage(image_path,debug=False,colour=False):
             # plt.show()
             square_images.append(square_img)
 
-        if not debug:
+        if debug:
             plt.figure(figsize=(6,6))
             plt.title("Detected Chessboard Squares")
             plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
@@ -803,7 +806,7 @@ def loadBinaryModel(model_path,weight_path):
     model.load_weights(weight_path)
     return model
 
-def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False):
+def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChessTable=False):
     """
     Uses a binary model to decide if a square is empty. If not, expand the square
     to fully include any piece detected via edge detection.
@@ -859,9 +862,9 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False):
 
         # Compute new expanded coordinates in the original image
         x_min_new = max(x_min + x_piece , 0)
-        y_min_new = max(y_min + y_piece - margin , 0)
+        y_min_new = max(y_min + y_piece, 0)
         x_max_new = min(x_min + x_piece + w_piece, warped.shape[1])
-        y_max_new = min(y_min + y_piece + h_piece, warped.shape[0])
+        y_max_new = min(y_min + y_piece + h_piece + margin, warped.shape[0])
 
         x_min_new_clipped = max(x_min_new, 0)
         y_min_new_clipped = max(y_min_new, 0)
@@ -876,46 +879,46 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False):
         square_crop = cv2.resize(square_crop, (64, 64))
     return square_crop
 
-path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
 
-path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
-image_files = [
-    os.path.join(path_testing, f)
-    for f in os.listdir(path_testing)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-
-image_filesO = [
-    os.path.join(path_opening, f)
-    for f in os.listdir(path_opening)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesM = [
-    os.path.join(path_midgame, f)
-    for f in os.listdir(path_midgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesE = [
-    os.path.join(path_endgame, f)
-    for f in os.listdir(path_endgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
+# image_files = [
+#     os.path.join(path_testing, f)
+#     for f in os.listdir(path_testing)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
 
-image_files = image_filesO + image_filesM + image_filesE
+# image_filesO = [
+#     os.path.join(path_opening, f)
+#     for f in os.listdir(path_opening)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
-offset = 0
-for i, image in enumerate(image_files):
-    if i < offset:
-        continue
-    print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=False,colour=True)
+# image_filesM = [
+#     os.path.join(path_midgame, f)
+#     for f in os.listdir(path_midgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+# image_filesE = [
+#     os.path.join(path_endgame, f)
+#     for f in os.listdir(path_endgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+
+# image_files = image_filesO + image_filesM + image_filesE
+
+# offset = 0
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     squares = getSquaresFromImage(image, debug=False,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
@@ -927,12 +930,15 @@ for i, image in enumerate(image_files):
 # ]
 
 # images = []
-# offset = 0
+# offset = 35
 # for i, image in enumerate(image_files):
 #     if i < offset:
 #         continue
 #     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-#     squares = getSquaresFromImage(image, debug=False)
+#     try:
+#         squares = getSquaresFromImage(image, debug=True,farChessTable=True)
+#     except Exception as e:
+#         print(f"Error processing image {image}: {e}")
 # getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test.jpg",debug=True)
 
 

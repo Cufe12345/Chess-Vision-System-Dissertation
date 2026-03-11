@@ -19,6 +19,8 @@ __pycache__/
 # Folders
 Experimenting/
 trainingData/
+processed/
+processedValidation/
 
 # C extensions
 *.so

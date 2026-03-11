@@ -68,7 +68,7 @@ def get_chessRedImages(colour):
     for i, image in enumerate(image_files):
         # print(f"Processing image {i+1}/{len(image_files)}: {image}")
         try:
-            squares = BoardSegmentation.getSquaresFromImage(image, colour=colour)
+            squares = BoardSegmentation.getSquaresFromImage(image, colour=colour,farChessTable=True)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
             images.append((squares, labels))
 
@@ -156,13 +156,19 @@ def get_myImages(colour):
         try:
             squares = BoardSegmentation.getSquaresFromImage(image, colour=colour)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
-
             # labels values need remapping as these images are side on
             remapped_labels = []
             for j in range(8):
                 for i in range(7,-1,-1):
                     remapped_labels.append(labels[i*8 + j])
 
+            # if(image == "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening\\1k1rq2r_1pp1bp2_p1N2n2_n2P1Qp1_3p3p_P5B1_1PPN1PPP_R3R1K1,b,-,-,3,18.jpg"):
+            #     print(f"Labels for {image}: {remapped_labels}")
+            #     for sq, label in zip(squares, remapped_labels):
+            #         plt.imshow(sq)
+            #         plt.title(f"Label: {label}")
+            #         plt.axis('off')
+            #         plt.show()
             final_images.append((squares, remapped_labels))
             print(f"Labels for {image}: {remapped_labels}")
         except Exception as e:
@@ -229,6 +235,7 @@ def getTrainingData(colour):
         pickle.dump(imagesMy, f)
     return (imagesRed, imagesZenodo, imagesMy)
 
+
 def loadTrainingData(colour):
 
     try:
@@ -243,6 +250,159 @@ def loadTrainingData(colour):
         return loadTrainingData(colour)
     return (training_dataRed, training_dataZenodo, training_dataMy)
 
+def dataPreprocessingMy(data,data_augmentation=False,colour=False):
+    # Placeholder for data preprocessing logic
+
+    new_data = []
+
+    augmentation_pipeline = A.Compose([
+    A.Rotate(limit=5, p=0.3),
+
+    A.ShiftScaleRotate(
+        shift_limit=0.05,
+        scale_limit=0.05,
+        rotate_limit=5,
+        p=0.3
+    ),
+
+    A.RandomBrightnessContrast(
+        brightness_limit=0.25,
+        contrast_limit=0.25,
+        p=0.4
+    ),
+
+    A.GaussNoise(
+        std_range=(0.05, 0.1),
+        p=0.2
+    ),
+
+    # Simulates camera compression
+    A.ImageCompression(
+        quality_range=(60, 100),
+        p=0.3
+    ),
+
+    # Slight blur from camera focus
+    A.GaussianBlur(
+        blur_limit=(3,5),
+        p=0.2
+    ),
+
+    # Lighting color changes
+    A.HueSaturationValue(
+        hue_shift_limit=8,
+        sat_shift_limit=15,
+        val_shift_limit=10,
+        p=0.3
+    ),
+
+    # Slight perspective distortion from angled photos
+    A.Perspective(
+        scale=(0.02, 0.05),
+        p=0.25
+    ),
+
+    # Small crop then resize (simulates imperfect square detection)
+    A.RandomResizedCrop(
+        size=(128,128),
+        scale=(0.9,1.0),
+        ratio=(0.95,1.05),
+        p=0.3
+    )
+    ])
+    
+    NUM_AUGMENTATIONS = 5
+    
+    piece_to_int = {
+        '': 0,   # empty
+        'P': 1,   # white pawn
+        'N': 2,   # white knight
+        'B': 3,   # white bishop
+        'R': 4,   # white rook
+        'Q': 5,   # white queen
+        'K': 6,   # white king
+        'p': 7,   # black pawn
+        'n': 8,
+        'b': 9,
+        'r': 10,
+        'q': 11,
+        'k': 12
+    }
+
+
+    #Reize images, grey scale, normalise
+    for image in data:
+        squares, labels = image
+        first = True
+        firstAug = True
+        for index,sq in enumerate(squares):
+            if labels[index] == '' and np.random.rand() < 0.5:  # Skip some empty squares to balance the dataset
+                continue
+            # if labels[index] == 'P' or labels[index] == 'p' and np.random.rand() < 0.7:  # Skip some empty squares to balance the dataset
+            #     continue
+            resized_sq = sq
+            if colour:
+                resized_sq = cv2.resize(sq, (128, 128))
+            else:
+                resized_sq = cv2.resize(sq, (64, 64))
+            grey_sq = resized_sq
+            if not colour:
+                grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
+
+            # if first and labels[index] != '':
+            #     plt.imshow(grey_sq, cmap='gray')
+            #     plt.title(f"Label: {labels[index]}")
+            #     plt.axis('off')
+            #     plt.show()
+            #     first = True
+            # if len(squares) -1 == index:
+            #     plt.imshow(grey_sq, cmap='gray')
+            #     plt.title(f"Label: {labels[index]}")
+            #     plt.axis('off')
+            #     plt.show()
+            norm_sq = grey_sq
+            if not colour:
+                norm_sq = norm_sq / 255.0
+                norm_sq = norm_sq[...,None] # add channel dimension
+            new_data.append((norm_sq, piece_to_int[labels[index]]))
+
+            if data_augmentation:
+                for _ in range(NUM_AUGMENTATIONS):
+                    
+
+                    if labels[index] == '' and np.random.rand() <0.0:  # Skip some empty squares to balance the dataset
+                        continue
+                        # if labels[count] == 'P' or labels[count] == 'p' and np.random.rand() < 0.7:  # Skip some empty squares to balance the dataset
+                        #     count += 1
+                        #     continue
+                    resized_aug = sq
+                    if colour:
+                        resized_aug = cv2.resize(sq, (128, 128))
+                    else:    
+                        resized_aug = cv2.resize(sq, (64, 64))
+                    augmented = augmentation_pipeline(image=resized_aug)['image']
+                    grey_aug = augmented
+                    if not colour:
+                        grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
+                        # if firstAug:
+                        #     plt.imshow(grey_aug, cmap='gray')
+                        #     plt.title(f"Augmented Label: {labels[count]}")
+                        #     plt.axis('off')
+                        #     plt.show()
+                        #     firstAug = False
+                        # if len(squares) -1 == count:
+                        #     plt.imshow(grey_aug, cmap='gray')
+                        #     plt.title(f"Label: {labels[count]} (Augmented)")
+                        #     plt.axis('off')
+                        #     plt.show()
+                    norm_aug = grey_aug
+                    if not colour:
+                        norm_aug = norm_aug / 255.0
+                        norm_aug = norm_aug[...,None] # add channel dimension
+                    new_data.append((norm_aug, piece_to_int[labels[index]]))
+    
+    return new_data
+
 def dataPreprocessingRed(data,data_augmentation=False,colour=False):
     # Placeholder for data preprocessing logic
 
@@ -250,12 +410,56 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
 
     augmentation_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3),
-    A.RandomBrightnessContrast(p=0.3),
-    A.GaussNoise(p=0.2),
+
     A.ShiftScaleRotate(
         shift_limit=0.05,
         scale_limit=0.05,
         rotate_limit=5,
+        p=0.3
+    ),
+
+    A.RandomBrightnessContrast(
+        brightness_limit=0.25,
+        contrast_limit=0.25,
+        p=0.4
+    ),
+
+    A.GaussNoise(
+        std_range=(0.05, 0.1),
+        p=0.2
+    ),
+
+    # Simulates camera compression
+    A.ImageCompression(
+        quality_range=(60, 100),
+        p=0.3
+    ),
+
+    # Slight blur from camera focus
+    A.GaussianBlur(
+        blur_limit=(3,5),
+        p=0.2
+    ),
+
+    # Lighting color changes
+    A.HueSaturationValue(
+        hue_shift_limit=8,
+        sat_shift_limit=15,
+        val_shift_limit=10,
+        p=0.3
+    ),
+
+    # Slight perspective distortion from angled photos
+    A.Perspective(
+        scale=(0.02, 0.05),
+        p=0.25
+    ),
+
+    # Small crop then resize (simulates imperfect square detection)
+    A.RandomResizedCrop(
+        size=(128,128),
+        scale=(0.9,1.0),
+        ratio=(0.95,1.05),
         p=0.3
     )
 ])
@@ -285,8 +489,10 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
         first = True
         firstAug = True
         for index,sq in enumerate(squares):
-            if labels[index] == '' and np.random.rand() < 0.0:  # Skip some empty squares to balance the dataset
+            if labels[index] == '' and np.random.rand() < 0.5:  # Skip some empty squares to balance the dataset
                 continue
+            # if labels[index] == 'P' or labels[index] == 'p' and np.random.rand() < 0.7:  # Skip some empty squares to balance the dataset
+            #     continue
             resized_sq = sq
             if colour:
                 resized_sq = cv2.resize(sq, (128, 128))
@@ -296,12 +502,12 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
             if not colour:
                 grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
 
-            # if first:
+            # if first and labels[index] != '':
             #     plt.imshow(grey_sq, cmap='gray')
             #     plt.title(f"Label: {labels[index]}")
             #     plt.axis('off')
             #     plt.show()
-            #     first = False
+            #     first = True
             # if len(squares) -1 == index:
             #     plt.imshow(grey_sq, cmap='gray')
             #     plt.title(f"Label: {labels[index]}")
@@ -313,13 +519,16 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
                 norm_sq = norm_sq[...,None] # add channel dimension
             new_data.append((norm_sq, piece_to_int[labels[index]]))
 
-        if data_augmentation:
-            for _ in range(NUM_AUGMENTATIONS):
-                
-                count = 0
-                for sq in squares:
-                    if labels[count] == '' and np.random.rand() <1:  # Skip some empty squares to balance the dataset
-                        continue
+            if data_augmentation:
+                for _ in range(NUM_AUGMENTATIONS):
+                    
+                    count = 0
+                    if labels[index] == '' and np.random.rand() <0.0:  # Skip empty squares to balance the dataset
+                            count += 1
+                            continue
+                        # if labels[count] == 'P' or labels[count] == 'p' and np.random.rand() < 0.7:  # Skip some empty squares to balance the dataset
+                        #     count += 1
+                        #     continue
                     resized_aug = sq
                     if colour:
                         resized_aug = cv2.resize(sq, (128, 128))
@@ -329,22 +538,22 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
                     grey_aug = augmented
                     if not colour:
                         grey_aug = cv2.cvtColor(augmented, cv2.COLOR_BGR2GRAY)
-                    # if firstAug:
-                    #     plt.imshow(grey_aug, cmap='gray')
-                    #     plt.title(f"Augmented Label: {labels[count]}")
-                    #     plt.axis('off')
-                    #     plt.show()
-                    #     firstAug = False
-                    # if len(squares) -1 == count:
-                    #     plt.imshow(grey_aug, cmap='gray')
-                    #     plt.title(f"Label: {labels[count]} (Augmented)")
-                    #     plt.axis('off')
-                    #     plt.show()
+                        # if firstAug:
+                        #     plt.imshow(grey_aug, cmap='gray')
+                        #     plt.title(f"Augmented Label: {labels[count]}")
+                        #     plt.axis('off')
+                        #     plt.show()
+                        #     firstAug = False
+                        # if len(squares) -1 == count:
+                        #     plt.imshow(grey_aug, cmap='gray')
+                        #     plt.title(f"Label: {labels[count]} (Augmented)")
+                        #     plt.axis('off')
+                        #     plt.show()
                     norm_aug = grey_aug
                     if not colour:
                         norm_aug = norm_aug / 255.0
                         norm_aug = norm_aug[...,None] # add channel dimension
-                    new_data.append((norm_aug, piece_to_int[labels[count]]))
+                    new_data.append((norm_aug, piece_to_int[labels[index]]))
                     count += 1
     
     return new_data
@@ -356,12 +565,56 @@ def dataPreprocessingZenodo(data,data_augmentation=False,colour=False):
 
     augmentation_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3),
-    A.RandomBrightnessContrast(p=0.3),
-    A.GaussNoise(p=0.2),
+
     A.ShiftScaleRotate(
         shift_limit=0.05,
         scale_limit=0.05,
         rotate_limit=5,
+        p=0.3
+    ),
+
+    A.RandomBrightnessContrast(
+        brightness_limit=0.25,
+        contrast_limit=0.25,
+        p=0.4
+    ),
+
+    A.GaussNoise(
+        std_range=(0.05, 0.1),
+        p=0.2
+    ),
+
+    # Simulates camera compression
+    A.ImageCompression(
+        quality_range=(60, 100),
+        p=0.3
+    ),
+
+    # Slight blur from camera focus
+    A.GaussianBlur(
+        blur_limit=(3,5),
+        p=0.2
+    ),
+
+    # Lighting color changes
+    A.HueSaturationValue(
+        hue_shift_limit=8,
+        sat_shift_limit=15,
+        val_shift_limit=10,
+        p=0.3
+    ),
+
+    # Slight perspective distortion from angled photos
+    A.Perspective(
+        scale=(0.02, 0.05),
+        p=0.25
+    ),
+
+    # Small crop then resize (simulates imperfect square detection)
+    A.RandomResizedCrop(
+        size=(128,128),
+        scale=(0.9,1.0),
+        ratio=(0.95,1.05),
         p=0.3
     )
 ])
@@ -433,8 +686,28 @@ def dataPreprocessingZenodo(data,data_augmentation=False,colour=False):
     
     return new_data
 
-def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32,sample_weights=None):
-    x = preprocess_input(x)
+def savePreprocessedData(images,validation=False):
+    # clear processed folder first
+    
+    save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processed"
+
+    if validation:
+        save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processedValidation"
+    print("Removing old processed images...")
+    for filename in os.listdir(save_path):
+        os.remove(os.path.join(save_path, filename))
+    
+    print("Finished clearing old images. Saving new preprocessed images...")
+    count = 0
+    paths = []
+    for img, label in images:
+        filename = f"img_{count}_{label}.png"
+        cv2.imwrite(os.path.join(save_path, filename), img)
+        paths.append(os.path.join(save_path, filename))
+        count += 1
+    return paths
+
+def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=45, batch_size=32,sample_weights=None):
     base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
     base_model.trainable = False  # freeze for initial training
     model = models.Sequential([
@@ -445,57 +718,55 @@ def denseNetPieceRecognitionModel(x, y, num_classes=13, epochs=20, batch_size=32
     layers.Dropout(0.5),
     layers.Dense(num_classes, activation='softmax')
     ])
-
+    early_stop = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=5,
+        restore_best_weights=True
+    )
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    indices = np.arange(len(x))
-    train_idx, val_idx = train_test_split(
-    indices,
-    test_size=0.2,
-    stratify=y,
-    random_state=42
-    )
-
-    x_train, y_train = x[train_idx], y[train_idx]
-    x_val, y_val = x[val_idx], y[val_idx]
-
-    sw_train,sw_val = sample_weights[train_idx], sample_weights[val_idx]
-
-    model.fit(
-        x_train,
-        y_train,
-        validation_data=(x_val, y_val),
-        batch_size=batch_size,
-        epochs=epochs,
-        shuffle=True,
-        sample_weight=sw_train
-    )
-
-    # print("Unfreezing base model for fine-tuning...")
-    # base_model.trainable = True
-
-    # for layer in base_model.layers[:-40]:  # Freeze all but last 40 layers
-    #     layer.trainable = False
-    
-    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    # x_train, x_val, y_train, y_val = train_test_split(
-    # x, y,
+    # indices = np.arange(len(x))
+    # train_idx, val_idx = train_test_split(
+    # indices,
     # test_size=0.2,
     # stratify=y,
     # random_state=42
     # )
 
+    # x_train, y_train = x[train_idx], y[train_idx]
+    # x_val, y_val = x[val_idx], y[val_idx]
+
+    # sw_train,sw_val = sample_weights[train_idx], sample_weights[val_idx]
+
+    model.fit(
+        train_dataset,
+            validation_data=val_dataset,
+        epochs=epochs
+        # callbacks=[early_stop]
+    )
+
+    # print("Unfreezing base model for fine-tuning...")
+    # base_model.trainable = True
+
+    # for layer in base_model.layers[:-15]:  # Freeze all but last 40 layers
+    #     layer.trainable = False
+    
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # # x_train, x_val, y_train, y_val = train_test_split(
+    # # x, y,
+    # # test_size=0.2,
+    # # stratify=y,
+    # # random_state=42
+    # # )
+
     # model.fit(
-    #     x_train,
-    #     y_train,
-    #     validation_data=(x_val, y_val),
-    #     batch_size=batch_size,
+    #     train_dataset,
+    #     validation_data=val_dataset,
     #     epochs=epochs,
-    #     shuffle=True
     # )
     return model
 
-def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
+def trainPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=45, batch_size=32):
 
     model = models.Sequential([
         layers.Input(shape=(64, 64, 1)),
@@ -532,72 +803,150 @@ def trainPieceRecognitionModel(x, y, num_classes=13, epochs=45, batch_size=32):
 
     model.summary()
 
-    x_train, x_val, y_train, y_val = train_test_split(
-    x, y,
-    test_size=0.2,
-    stratify=y,
-    random_state=42
-    )
+
 
     model.fit(
-        x_train,
-        y_train,
-        validation_data=(x_val, y_val),
-        batch_size=batch_size,
+        train_dataset,
+        validation_data=val_dataset,
         epochs=epochs,
-        shuffle=True
     )
     # Train the model
     # model.fit(x, y, batch_size=batch_size, epochs=epochs, validation_split=0.2, shuffle=True)
 
     return model
 
+augmentation_pipeline = A.Compose([
+    A.Rotate(limit=5, p=0.3),
+    A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
+    A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
+    A.GaussNoise(std_range=(0.05, 0.1), p=0.2),
+    A.ImageCompression(quality_range=(60, 100), p=0.3),
+    A.GaussianBlur(blur_limit=(3,5), p=0.2),
+    A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
+    A.Perspective(scale=(0.02, 0.05), p=0.25),
+    A.RandomResizedCrop(size=(128,128), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
+])
+def augment_numpy(img,colour):
+    img = img.numpy()
+    colour = bool(colour.numpy())
+    img = img.astype(np.uint8)
+    augmented = augmentation_pipeline(image=img)["image"]
+    if not colour:
+                augmented = augmented / 255.0
+    return augmented.astype(np.float32)
+def augment_tf(img,colour):
+    img = tf.py_function(
+        func=augment_numpy,
+        inp=[img,colour],
+        Tout=tf.float32
+    )
+
+ # important
+    return img
+def loadImage(path,label,augmentation=False,colour=False):
+    img = tf.io.read_file(path)
+    if colour:
+        img = tf.image.decode_png(img, channels=3)
+    else:
+        img = tf.image.decode_png(img, channels=1)
+    if augmentation:
+        img = augment_tf(img,colour)
+
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    if colour:
+        img = preprocess_input(img)
+    return img, label
 def trainModel(color=False):
     print("Loading training data...")
     # (training_dataRed, training_dataZenodo, training_dataMy) = getTrainingData()
     (training_dataRed, training_dataZenodo, training_dataMy) = loadTrainingData(color)
     print(f"Loaded {len(training_dataRed) + len(training_dataZenodo) + len(training_dataMy)} total training samples.")
 
+    print("Splitting data into training and validation sets...")
+
+    training_my, val_my = train_test_split(training_dataMy, test_size=0.2, random_state=42)
+    training_red, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
+    training_zenodo, val_zenodo = train_test_split(training_dataZenodo, test_size=0.2, random_state=42)
     print("Preprocessing data...")
-    preprocessed_dataRed = dataPreprocessingRed(training_dataRed, data_augmentation=True,colour=color)
-    preprocessed_dataZenodo = dataPreprocessingZenodo(training_dataZenodo, data_augmentation=True,colour=color)
-    preprocessed_dataMy = dataPreprocessingRed(training_dataMy, data_augmentation=True,colour=color)
+    preprocessed_dataMy = dataPreprocessingMy(training_my, data_augmentation=False,colour=color)
+    preprocessed_dataRed = dataPreprocessingRed(training_red, data_augmentation=False,colour=color)
+    preprocessed_dataZenodo = dataPreprocessingZenodo(training_zenodo, data_augmentation=False,colour=color)
+
+    preprocessed_dataMy_Val = dataPreprocessingMy(val_my, data_augmentation=False,colour=color)
+    preprocessed_dataRed_Val = dataPreprocessingRed(val_red, data_augmentation=False,colour=color)
+    preprocessed_dataZenodo_Val = dataPreprocessingZenodo(val_zenodo, data_augmentation=False,colour=color)
     print(f"Preprocessed data. Total samples after augmentation: {len(preprocessed_dataRed) + len(preprocessed_dataZenodo) + len(preprocessed_dataMy)}")
     
+
     print("Getting ready to train the model...")
 
-    all_preprocessed_data = preprocessed_dataRed + preprocessed_dataZenodo
+    # all_preprocessed_data = preprocessed_dataRed + preprocessed_dataZenodo
+    all = preprocessed_dataRed + preprocessed_dataZenodo + preprocessed_dataMy
 
-    x = []
-    y = []
-    sample_weights = []
+    all_val = preprocessed_dataRed_Val + preprocessed_dataZenodo_Val + preprocessed_dataMy_Val
 
-    for square, label in all_preprocessed_data:
-        x.append(square)
-        y.append(label)
-        sample_weights.append(1.0)
+    # x = []
+    # y = []
+    # sample_weights = []
+
+    # # for square, label in all_preprocessed_data:
+    # #     x.append(square)
+    # #     y.append(label)
+    # #     sample_weights.append(1.0)
     
-    for square, label in preprocessed_dataMy:
-        x.append(square)
-        y.append(label)
-        sample_weights.append(3.0)  # Give more weight to my images to help the model generalize better to them
+    # for square, label in all:
+    #     x.append(square)
+    #     y.append(label)
+    #     sample_weights.append(1.0)  # Give more weight to my images to help the model generalize better to them
 
-    print(np.unique(y))
-    print(y[:20])
+    labels = []
+    for square, label in all:
+        labels.append(label)
+    
+    labels_val = []
+    for square, label in all_val:
+        labels_val.append(label)
+    
+    paths = savePreprocessedData(all)
+    paths_val = savePreprocessedData(all_val, validation=True)
+    
+    paths = tf.constant(paths)
+    labels = tf.constant(labels)
+    paths_val = tf.constant(paths_val)
+    labels_val = tf.constant(labels_val)
+
+    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
+    val_dataset = tf.data.Dataset.from_tensor_slices((paths_val, labels_val))
+
+    train_ds = (dataset
+               .map(lambda path, label: (loadImage(path, label,augmentation=True,colour=color)), num_parallel_calls=tf.data.AUTOTUNE)
+               .shuffle(buffer_size=1000)
+               .batch(32)
+               .prefetch(tf.data.AUTOTUNE)
+    )
+
+    val_ds = (val_dataset
+               .map(lambda path, label: (loadImage(path, label,augmentation=False,colour=color)), num_parallel_calls=tf.data.AUTOTUNE)
+               .batch(32)
+               .prefetch(tf.data.AUTOTUNE)
+    )
+
+    # print(np.unique(y))
+    # print(y[:20])
 
 
-    # Convert to numpy arrays
-    x = np.array(x, dtype="float32")
-    print(x.shape)
-    y = np.array(y, dtype="int32")
-    sample_weights = np.array(sample_weights, dtype="float32")
-    print(np.unique(y))
-    print(y[:20])
-    print(x.nbytes / 1e9, "GB")
+    # # Convert to numpy arrays
+    # x = np.array(x, dtype="float32")
+    # print(x.shape)
+    # y = np.array(y, dtype="int32")
+    # sample_weights = np.array(sample_weights, dtype="float32")
+    # print(np.unique(y))
+    # print(y[:20])
+    # print(x.nbytes / 1e9, "GB")
     if not color:
-        model = trainPieceRecognitionModel(x,y)
+        model = trainPieceRecognitionModel(train_ds,val_ds)
     else:
-        model = denseNetPieceRecognitionModel(x,y,sample_weights=sample_weights)
+        model = denseNetPieceRecognitionModel(train_ds,val_ds)
     model.save("piece_recognition_model.h5")
     model.save_weights("piece_recognition_weights.h5")
 
@@ -695,6 +1044,6 @@ def visualisePredictions(predicted_labels):
     Visual_Representation.visualize_fen(fen_string)
 
 
-trainModel(True)
-testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+# trainModel(True)
+# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
 visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbq1rk1_ppp1ppbp_5np1_8_2BP1B2_2N1P3_PP3PPP_R2QK1NR,w,-,-,0,1.jpg", color=True)[0])
