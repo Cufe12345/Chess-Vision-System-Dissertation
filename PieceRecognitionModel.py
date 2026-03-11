@@ -10,6 +10,7 @@ import pickle
 from tensorflow.keras.applications import DenseNet121
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.applications.densenet import preprocess_input
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 import Visual_Representation
 
@@ -707,7 +708,7 @@ def savePreprocessedData(images,validation=False):
         count += 1
     return paths
 
-def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=45, batch_size=32,sample_weights=None):
+def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=30, batch_size=32,sample_weights=None):
     base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
     base_model.trainable = False  # freeze for initial training
     model = models.Sequential([
@@ -748,10 +749,10 @@ def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, ep
     # print("Unfreezing base model for fine-tuning...")
     # base_model.trainable = True
 
-    # for layer in base_model.layers[:-15]:  # Freeze all but last 40 layers
+    # for layer in base_model.layers[:-50]:  # Freeze all but last 40 layers
     #     layer.trainable = False
     
-    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-6), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     # # x_train, x_val, y_train, y_val = train_test_split(
     # # x, y,
     # # test_size=0.2,
@@ -762,7 +763,7 @@ def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, ep
     # model.fit(
     #     train_dataset,
     #     validation_data=val_dataset,
-    #     epochs=epochs,
+    #     epochs=epochs*2,
     # )
     return model
 
@@ -824,7 +825,9 @@ augmentation_pipeline_128 = A.Compose([
     A.GaussianBlur(blur_limit=(3,5), p=0.2),
     A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
     A.Perspective(scale=(0.02, 0.05), p=0.25),
-    A.RandomResizedCrop(size=(128,128), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
+    A.ElasticTransform(alpha=1, sigma=5, p=0.1),  # subtle shape distortion
+    A.GridDistortion(num_steps=3, distort_limit=0.05, p=0.1),
+    # A.RandomResizedCrop(size=(128,128), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
 ])
 augmentation_pipeline_64 = A.Compose([
     A.Rotate(limit=5, p=0.3),
@@ -835,7 +838,9 @@ augmentation_pipeline_64 = A.Compose([
     A.GaussianBlur(blur_limit=(3,5), p=0.2),
     A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
     A.Perspective(scale=(0.02, 0.05), p=0.25),
-    A.RandomResizedCrop(size=(64,64), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
+    A.ElasticTransform(alpha=1, sigma=5, p=0.1),  # subtle shape distortion
+    A.GridDistortion(num_steps=3, distort_limit=0.05, p=0.1),
+    # A.RandomResizedCrop(size=(64,64), scale=(0.9,1.0), ratio=(0.95,1.05), p=0.3)
 ])
 def augment_numpy(img,colour):
     img = img.numpy()
@@ -899,9 +904,9 @@ def trainModel(color=False):
     print("Getting ready to train the model...")
 
     # all_preprocessed_data = preprocessed_dataRed + preprocessed_dataZenodo
-    all = preprocessed_dataRed + preprocessed_dataZenodo + preprocessed_dataMy
+    all = preprocessed_dataRed  + preprocessed_dataMy
 
-    all_val = preprocessed_dataRed_Val + preprocessed_dataZenodo_Val + preprocessed_dataMy_Val
+    all_val = preprocessed_dataRed_Val  + preprocessed_dataMy_Val
 
     # x = []
     # y = []
@@ -984,6 +989,24 @@ def testModel(model, weight, color=False):
     if color:
         x_test = preprocess_input(x_test)
     model.evaluate(x_test, y_test)
+    # Confusion matrix
+    y_pred = np.argmax(model.predict(x_test), axis=1)
+
+    int_to_piece = {
+        0: 'empty', 1: 'P', 2: 'N', 3: 'B', 4: 'R',
+        5: 'Q', 6: 'K', 7: 'p', 8: 'n', 9: 'b',
+        10: 'r', 11: 'q', 12: 'k'
+    }
+    
+    class_names = [int_to_piece[i] for i in range(13)]
+    
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    fig, ax = plt.subplots(figsize=(12, 12))
+    disp.plot(ax=ax, colorbar=False)
+    plt.title("Piece Recognition Confusion Matrix")
+    plt.tight_layout()
+    plt.show()
 
 def labels_to_fen(predicted_labels):
     fen_rows = []
@@ -1017,6 +1040,11 @@ def makePredictions(model, weight, image, color=False):
         else:
             resized_sq = cv2.resize(sq, (64, 64))
         grey_sq = resized_sq
+        #show the square being predicted
+        # plt.imshow(grey_sq, cmap='gray')
+        # plt.title(f"Square being predicted")
+        # plt.axis('off')
+        # plt.show()
         if not color:
             grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
         norm_sq = grey_sq
@@ -1062,6 +1090,6 @@ def visualisePredictions(predicted_labels):
     Visual_Representation.visualize_fen(fen_string)
 
 
-# trainModel(True)
-# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+trainModel(True)
+testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
 visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\r5k1_pp5p_2pp4_4p3_nPP3p1_4P1P1_P1P5_3R1NK1,b,-,-,0,23.jpg", color=True)[0])

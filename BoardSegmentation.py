@@ -785,11 +785,11 @@ def getSquaresFromImage(image_path,debug=False,colour=False,farChessTable=False)
 
             square_img =  expand_square_if_not_empty(model,warped, sq, margin=50,colour=colour,farChessTable=farChessTable)
 
-            # plt.figure(figsize=(4,4))
-            # plt.title("Extracted Square")
-            # plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
-            # plt.axis('off')
-            # plt.show()
+            plt.figure(figsize=(4,4))
+            plt.title("Extracted Square")
+            plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.show()
             square_images.append(square_img)
 
         if debug:
@@ -825,100 +825,140 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChess
     ys = sq[:, 1]
     x_min, x_max = xs.min(), xs.max()
     y_min, y_max = ys.min(), ys.max()
+
     x_min_clipped = max(x_min, 0)
     y_min_clipped = max(y_min, 0)
     x_max_clipped = min(x_max, warped.shape[1])
     y_max_clipped = min(y_max, warped.shape[0])
 
-    # Crop initial square
     square_crop = warped[y_min_clipped:y_max_clipped, x_min_clipped:x_max_clipped]
 
-    # Prepare for model prediction
+    # Binary model check
     square_input = cv2.resize(square_crop, (64, 64))
-
     square_input = cv2.cvtColor(square_input, cv2.COLOR_BGR2GRAY)
     norm_sq = square_input / 255.0
-    norm_sq = norm_sq[...,None] # add channel dimension
-    norm_sq = np.expand_dims(norm_sq, axis=0) 
+    norm_sq = norm_sq[..., None]
+    norm_sq = np.expand_dims(norm_sq, axis=0)
 
     pred = model.predict(norm_sq, verbose=0)[0][0]
 
-    # If empty (prediction < 0.5), return original square resized
     if pred < 0.5:
-        # print("Square predicted empty, no expansion")
+        if colour:
+            return cv2.resize(square_crop, (128, 128))
         return cv2.resize(square_crop, (64, 64))
 
-    # --- Occupied → expand using edges ---
-    if len(square_crop.shape) == 3:
-        square_gray = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+    # --- Occupied: BFS flood fill from centre to find piece bounds ---
+    if len(warped.shape) == 3:
+        img_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
     else:
-        square_gray = square_crop.copy()
+        img_gray = warped.copy()
 
-    edges = cv2.Canny(square_gray, 50, 150)
-    coords = cv2.findNonZero(edges)
+    cx = (x_min + x_max) // 2
+    cy = (y_min + y_max) // 2
+    square_height = y_max - y_min
+    square_width = x_max - x_min
 
-    if coords is not None:
-        x_piece, y_piece, w_piece, h_piece = cv2.boundingRect(coords)
+    piece_colour = float(img_gray[cy, cx])
+    deviation_threshold = 3
 
-        # Compute new expanded coordinates in the original image
-        x_min_new = max(x_min + x_piece , 0)
-        y_min_new = max(y_min + y_piece, 0)
-        x_max_new = min(x_min + x_piece + w_piece, warped.shape[1])
-        y_max_new = min(y_min + y_piece + h_piece + margin, warped.shape[0])
+    # BFS flood fill bounded to 3x square size search area
+    search_y_min = max(cy - 3 * square_height, 0)
+    search_y_max = min(cy + 3 * square_height, warped.shape[0])
+    search_x_min = max(cx - 3 * square_width, 0)
+    search_x_max = min(cx + 3 * square_width, warped.shape[1])
 
-        x_min_new_clipped = max(x_min_new, 0)
-        y_min_new_clipped = max(y_min_new, 0)
-        x_max_new_clipped = min(x_max_new, warped.shape[1])
-        y_max_new_clipped = min(y_max_new, warped.shape[0])
-        square_crop = warped[y_min_new_clipped:y_max_new_clipped, x_min_new_clipped:x_max_new_clipped]
+    visited = np.zeros(warped.shape[:2], dtype=bool)
+    queue = [(cy, cx)]
+    visited[cy, cx] = True
 
-    # Resize to uniform 64x64
+    piece_top = cy
+    piece_bottom = cy
+    piece_left = cx
+    piece_right = cx
+
+    # 8-connected neighbourhood
+    neighbours = [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)]
+
+    while queue:
+        y, x = queue.pop(0)
+
+        # Update bounding box
+        piece_top = min(piece_top, y)
+        piece_bottom = max(piece_bottom, y)
+        piece_left = min(piece_left, x)
+        piece_right = max(piece_right, x)
+
+        for dy, dx in neighbours:
+            ny, nx = y + dy, x + dx
+
+            # Stay within search bounds
+            if not (search_y_min <= ny < search_y_max and search_x_min <= nx < search_x_max):
+                continue
+            if visited[ny, nx]:
+                continue
+
+            if abs(float(img_gray[ny, nx]) - piece_colour) <= deviation_threshold:
+                visited[ny, nx] = True
+                queue.append((ny, nx))
+
+    # Only expand if piece extends beyond current square bounds
+    new_y_min = piece_top if piece_top < y_min else y_min
+    new_y_max = piece_bottom if piece_bottom > y_max else y_max
+    new_x_min = piece_left if piece_left < x_min else x_min
+    new_x_max = piece_right if piece_right > x_max else x_max
+
+    # Apply margin only where expansion happened
+    new_y_min = max(new_y_min - (margin if new_y_min < y_min else 0), 0)
+    new_y_max = min(new_y_max + (margin if new_y_max > y_max else 0), warped.shape[0])
+    new_x_min = max(new_x_min - (margin if new_x_min < x_min else 0), 0)
+    new_x_max = min(new_x_max + (margin if new_x_max > x_max else 0), warped.shape[1])
+
+    square_crop = warped[new_y_min:new_y_max, new_x_min:new_x_max]
+
     if colour:
-        square_crop = cv2.resize(square_crop, (128, 128))
-    else:
-        square_crop = cv2.resize(square_crop, (64, 64))
-    return square_crop
+        return cv2.resize(square_crop, (128, 128))
+    return cv2.resize(square_crop, (64, 64))
 
-# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
 
-# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
-# image_files = [
-#     os.path.join(path_testing, f)
-#     for f in os.listdir(path_testing)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
+image_files = [
+    os.path.join(path_testing, f)
+    for f in os.listdir(path_testing)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
 
-# image_filesO = [
-#     os.path.join(path_opening, f)
-#     for f in os.listdir(path_opening)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
+image_filesO = [
+    os.path.join(path_opening, f)
+    for f in os.listdir(path_opening)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
-# image_filesM = [
-#     os.path.join(path_midgame, f)
-#     for f in os.listdir(path_midgame)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
+image_filesM = [
+    os.path.join(path_midgame, f)
+    for f in os.listdir(path_midgame)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
-# image_filesE = [
-#     os.path.join(path_endgame, f)
-#     for f in os.listdir(path_endgame)
-#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-# ]
+image_filesE = [
+    os.path.join(path_endgame, f)
+    for f in os.listdir(path_endgame)
+    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+]
 
 
-# image_files = image_filesO + image_filesM + image_filesE
+image_files = image_filesO + image_filesM + image_filesE
 
-# offset = 0
-# for i, image in enumerate(image_files):
-#     if i < offset:
-#         continue
-#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
-#     squares = getSquaresFromImage(image, debug=False,colour=True)
+offset = 0
+for i, image in enumerate(image_files):
+    if i < offset:
+        continue
+    print(f"Processing image {i+1}/{len(image_files)}: {image}")
+    squares = getSquaresFromImage(image, debug=False,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")

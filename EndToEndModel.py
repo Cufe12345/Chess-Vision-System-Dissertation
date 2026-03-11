@@ -7,6 +7,7 @@ import albumentations as A
 import tensorflow as tf
 from tensorflow.keras import layers, models 
 import numpy as np
+from tensorflow.keras.applications import DenseNet121
 
 
 def fen_to_labels(fen):
@@ -245,6 +246,64 @@ def dataPreprocessingRed(data,data_augmentation=False):
     return new_data
 
 
+def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=30, batch_size=32,sample_weights=None):
+    base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+    base_model.trainable = False  # freeze for initial training
+    model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.BatchNormalization(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(num_classes, activation='softmax')
+    ])
+    early_stop = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=5,
+        restore_best_weights=True
+    )
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.summary()
+    # indices = np.arange(len(x))
+    # train_idx, val_idx = train_test_split(
+    # indices,
+    # test_size=0.2,
+    # stratify=y,
+    # random_state=42
+    # )
+
+    # x_train, y_train = x[train_idx], y[train_idx]
+    # x_val, y_val = x[val_idx], y[val_idx]
+
+    # sw_train,sw_val = sample_weights[train_idx], sample_weights[val_idx]
+
+    model.fit(
+        train_dataset,
+            validation_data=val_dataset,
+        epochs=epochs
+        # callbacks=[early_stop]
+    )
+
+    # print("Unfreezing base model for fine-tuning...")
+    # base_model.trainable = True
+
+    # for layer in base_model.layers[:-50]:  # Freeze all but last 40 layers
+    #     layer.trainable = False
+    
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-6), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # # x_train, x_val, y_train, y_val = train_test_split(
+    # # x, y,
+    # # test_size=0.2,
+    # # stratify=y,
+    # # random_state=42
+    # # )
+
+    # model.fit(
+    #     train_dataset,
+    #     validation_data=val_dataset,
+    #     epochs=epochs*2,
+    # )
+    return model
 def trainEndToEndModel(x, y, num_classes=13, epochs=45, batch_size=32):
 
     num_squares = 64
