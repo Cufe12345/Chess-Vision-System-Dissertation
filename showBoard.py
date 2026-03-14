@@ -31,7 +31,8 @@ def captureBoardImage(cam, fen):
     result, image = cam.read()
     if result:
         state = getGameStateFromFEN(fen)
-        cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\{state}\\{FEN_To_Filename(fen)}.jpg", image)
+        # cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\{state}\\{FEN_To_Filename(fen)}.jpg", image)
+        cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers\\{FEN_To_Filename(fen)}.jpg", image)
         print(f"Image Captured")
     else:
         print("Error capturing image")
@@ -103,7 +104,7 @@ while True:
     print(f"Game State: {state}")
     if state == "endgame":
         print_ascii(fen)
-        Visual_Representation.visualize_fen(fen)
+        # Visual_Representation.visualize_fen(fen,"none.png")
         option = input("Press 's' to skip or anything else to capture image...")
         if(option.lower() != 's'):
             captureBoardImage(camera, fen)

@@ -15,15 +15,36 @@ def getSquaresFromImage(image_path,debug=False,colour=False,farChessTable=False)
         img = cv2.imread(image_path)
         h, w = img.shape[:2]
 
+        if debug:
+            plt.figure(figsize=(6,6))
+            plt.title("Original Image")
+            plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.show()
+        
         margin_x = int(0.05 * w)  # 5% of width
         margin_y = int(0.05 * h)  # 5% of height
 
         grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         grey = cv2.equalizeHist(grey)
-        #seems weird we see?
+        
+        if debug:
+            plt.figure(figsize=(6,6))
+            plt.title("Preprocessed Grayscale Image")
+            plt.imshow(grey, cmap='gray')
+            plt.axis('off')
+            plt.show()
         # grey = np.float32(grey)
 
         blur = cv2.GaussianBlur(grey, (5, 5), 0)
+
+        if debug:
+            plt.figure(figsize=(6,6))
+            plt.title("Blurred Image")
+            plt.imshow(blur, cmap='gray')
+            plt.axis('off')
+            plt.show()
+        
 
         temp = np.float32(blur)
 
@@ -124,6 +145,19 @@ def getSquaresFromImage(image_path,debug=False,colour=False,farChessTable=False)
 
         filtered_points = points[mask]
 
+        if debug:
+            #show filtered points
+            img_filtered = img.copy()
+            for x, y in filtered_points:
+                cv2.circle(img_filtered, (x, y), 3, (0, 255, 0), -1)
+            cv2.circle(img_filtered, (cx, cy), 8, (0, 255, 255), -1)   # yellow
+            cv2.putText(img_filtered, "Mean", (cx+10, cy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
+            plt.figure(figsize=(6,6))
+            plt.title("Filtered Corners")
+            plt.imshow(cv2.cvtColor(img_filtered, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.show()
         # filtered_points = filtered
 
         # img_before = img.copy()
@@ -770,26 +804,30 @@ def getSquaresFromImage(image_path,debug=False,colour=False,farChessTable=False)
         square_images = []
 
         for sq in squares:
-            # sq = sq.astype(int)
+            sq_t = sq.astype(int)
 
-            # xs = sq[:, 0]
-            # ys = sq[:, 1]
+            xs = sq_t[:, 0]
+            ys = sq_t[:, 1]
 
-            # x_min, x_max = xs.min(), xs.max()
-            # y_min, y_max = ys.min(), ys.max()
+            x_min, x_max = xs.min(), xs.max()
+            y_min, y_max = ys.min(), ys.max()
 
-            # square_img = warped[y_min:y_max, x_min:x_max]
+            square_img = warped[y_min:y_max, x_min:x_max]
 
             # # Optional: make uniform size for all squares
             # square_img = cv2.resize(square_img, (64, 64))  # 64x64 px for consistency
-
+            # plt.figure(figsize=(4,4))
+            # plt.title("Initial Square")
+            # plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
+            # plt.axis('off')
+            # plt.show()
             square_img =  expand_square_if_not_empty(model,warped, sq, margin=50,colour=colour,farChessTable=farChessTable)
 
-            plt.figure(figsize=(4,4))
-            plt.title("Extracted Square")
-            plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
-            plt.axis('off')
-            plt.show()
+            # plt.figure(figsize=(4,4))
+            # plt.title("Expanded Square")
+            # plt.imshow(cv2.cvtColor(square_img, cv2.COLOR_BGR2RGB))
+            # plt.axis('off')
+            # plt.show()
             square_images.append(square_img)
 
         if debug:
@@ -849,7 +887,7 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChess
 
     # --- Occupied: BFS flood fill from centre to find piece bounds ---
     if len(warped.shape) == 3:
-        img_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+        img_gray = warped.copy()
     else:
         img_gray = warped.copy()
 
@@ -858,14 +896,22 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChess
     square_height = y_max - y_min
     square_width = x_max - x_min
 
-    piece_colour = float(img_gray[cy, cx])
-    deviation_threshold = 3
+    
+    patch_size = 5  # sample a 5x5 patch
+    half = patch_size // 2
+    patch = img_gray[
+        max(cy - half, 0):min(cy + half + 1, warped.shape[0]),
+        max(cx - half, 0):min(cx + half + 1, warped.shape[1])
+    ]
+    piece_colour = patch.reshape(-1, 3).mean(axis=0).astype(float)
+
+    deviation_threshold = 18
 
     # BFS flood fill bounded to 3x square size search area
-    search_y_min = max(cy - 3 * square_height, 0)
-    search_y_max = min(cy + 3 * square_height, warped.shape[0])
-    search_x_min = max(cx - 3 * square_width, 0)
-    search_x_max = min(cx + 3 * square_width, warped.shape[1])
+    search_y_min = max(cy - 0.5 * square_height, 0)
+    search_y_max = min(cy + 0.5 * square_height, warped.shape[0])
+    search_x_min = max(cx - 0.5 * square_width, 0)
+    search_x_max = min(cx + 0.5 * square_width, warped.shape[1])
 
     visited = np.zeros(warped.shape[:2], dtype=bool)
     queue = [(cy, cx)]
@@ -896,17 +942,42 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChess
                 continue
             if visited[ny, nx]:
                 continue
-
-            if abs(float(img_gray[ny, nx]) - piece_colour) <= deviation_threshold:
+            pixel = img_gray[ny, nx].astype(float)
+            if np.linalg.norm(pixel - piece_colour) <= deviation_threshold:
+                # print("Deviating pixel found at", (ny, nx), "with value", np.linalg.norm(pixel - piece_colour))
                 visited[ny, nx] = True
                 queue.append((ny, nx))
-
+    
     # Only expand if piece extends beyond current square bounds
     new_y_min = piece_top if piece_top < y_min else y_min
     new_y_max = piece_bottom if piece_bottom > y_max else y_max
     new_x_min = piece_left if piece_left < x_min else x_min
     new_x_max = piece_right if piece_right > x_max else x_max
 
+    # vis = warped.copy()
+    
+    # # Draw all visited pixels in green
+    # vis[visited] = [0, 255, 0]
+    
+    # # Draw rejected pixels in red (within search bounds but outside threshold)
+    # for y in range(search_y_min, search_y_max):
+    #     for x in range(search_x_min, search_x_max):
+    #         if not visited[y, x]:
+    #             pixel = img_gray[y, x].astype(float)
+    #             if np.linalg.norm(pixel - piece_colour) > deviation_threshold:
+    #                 vis[y, x] = [0, 0, 255]
+
+    # # Draw the original square bounds in blue and new bounds in yellow
+    # cv2.rectangle(vis, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)      # blue = original
+    # cv2.rectangle(vis, (new_x_min, new_y_min), (new_x_max, new_y_max), (0, 255, 255), 2)  # yellow = expanded
+    # cv2.circle(vis, (cx, cy), 5, (255, 255, 255), -1)  # white = centre point
+
+    # plt.figure(figsize=(8, 8))
+    # plt.title(f"BFS Fill — threshold={deviation_threshold}")
+    # plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
+    # plt.axis('off')
+    # plt.show()
+    
     # Apply margin only where expansion happened
     new_y_min = max(new_y_min - (margin if new_y_min < y_min else 0), 0)
     new_y_max = min(new_y_max + (margin if new_y_max > y_max else 0), warped.shape[0])
@@ -919,46 +990,46 @@ def expand_square_if_not_empty(model, warped, sq, margin=2,colour=False,farChess
         return cv2.resize(square_crop, (128, 128))
     return cv2.resize(square_crop, (64, 64))
 
-path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+# path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
+# path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
+# path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
 
-path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+# path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
 
-image_files = [
-    os.path.join(path_testing, f)
-    for f in os.listdir(path_testing)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-
-image_filesO = [
-    os.path.join(path_opening, f)
-    for f in os.listdir(path_opening)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesM = [
-    os.path.join(path_midgame, f)
-    for f in os.listdir(path_midgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
-
-image_filesE = [
-    os.path.join(path_endgame, f)
-    for f in os.listdir(path_endgame)
-    if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
-]
+# image_files = [
+#     os.path.join(path_testing, f)
+#     for f in os.listdir(path_testing)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
 
-image_files = image_filesO + image_filesM + image_filesE
+# image_filesO = [
+#     os.path.join(path_opening, f)
+#     for f in os.listdir(path_opening)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
 
-offset = 0
-for i, image in enumerate(image_files):
-    if i < offset:
-        continue
-    print(f"Processing image {i+1}/{len(image_files)}: {image}")
-    squares = getSquaresFromImage(image, debug=False,colour=True)
+# image_filesM = [
+#     os.path.join(path_midgame, f)
+#     for f in os.listdir(path_midgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+# image_filesE = [
+#     os.path.join(path_endgame, f)
+#     for f in os.listdir(path_endgame)
+#     if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".tiff"))
+# ]
+
+
+# image_files = image_filesO + image_filesM + image_filesE
+
+# offset = 0
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     squares = getSquaresFromImage(image, debug=False,colour=True)
 
 # folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
 # image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
@@ -976,9 +1047,33 @@ for i, image in enumerate(image_files):
 #         continue
 #     print(f"Processing image {i+1}/{len(image_files)}: {image}")
 #     try:
-#         squares = getSquaresFromImage(image, debug=True,farChessTable=True)
+#         squares = getSquaresFromImage(image, debug=False,farChessTable=True)
 #     except Exception as e:
 #         print(f"Error processing image {image}: {e}")
+
+
+
+# folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
+# image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
+
+# image_files = [
+#     os.path.join(folder_path, f)
+#     for f in os.listdir(folder_path)
+#     if f.lower().endswith(image_extensions)
+# ]
+
+# images = []
+# offset = 34
+# for i, image in enumerate(image_files):
+#     if i < offset:
+#         continue
+#     print(f"Processing image {i+1}/{len(image_files)}: {image}")
+#     try:
+#         squares = getSquaresFromImage(image, debug=False,farChessTable=False)
+#     except Exception as e:
+#         print(f"Error processing image {image}: {e}")
+
+
 # getSquaresFromImage("C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\test.jpg",debug=True)
 
 

@@ -15,12 +15,19 @@ __pycache__/
 **/training_dataRed.pkl
 **/training_dataZenodo.pkl
 **/training_dataMy.pkl
+**/end_to_end_model.h5
+**/end_to_end_weights.h5
+**/best_model_finetuned.keras
+**/best_model_frozen.keras
+**/best_model.keras
 
 # Folders
 Experimenting/
 trainingData/
 processed/
 processedValidation/
+processedValidation_end_to_end/
+processed_end_to_end/
 
 # C extensions
 *.so

@@ -11,6 +11,9 @@ from tensorflow.keras.applications import DenseNet121
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.applications.densenet import preprocess_input
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.utils.class_weight import compute_class_weight
+import math
+from collections import Counter
 
 import Visual_Representation
 
@@ -57,6 +60,7 @@ def fen_to_labels(fen):
 
 def get_chessRedImages(colour):
     folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
+    folder_path2 = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     image_files = [
@@ -65,9 +69,15 @@ def get_chessRedImages(colour):
         if f.lower().endswith(image_extensions)
     ]
 
+    image_files += [
+        os.path.join(folder_path2, f)
+        for f in os.listdir(folder_path2)
+        if f.lower().endswith(image_extensions)
+    ]
+
     images = []
     for i, image in enumerate(image_files):
-        # print(f"Processing image {i+1}/{len(image_files)}: {image}")
+        print(f"Processing image {i+1}/{len(image_files)}: {image}")
         try:
             squares = BoardSegmentation.getSquaresFromImage(image, colour=colour,farChessTable=True)
             labels = fen_to_labels(os.path.basename(image).split('.')[0])
@@ -258,58 +268,15 @@ def dataPreprocessingMy(data,data_augmentation=False,colour=False):
 
     augmentation_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3),
-
-    A.ShiftScaleRotate(
-        shift_limit=0.05,
-        scale_limit=0.05,
-        rotate_limit=5,
-        p=0.3
-    ),
-
-    A.RandomBrightnessContrast(
-        brightness_limit=0.25,
-        contrast_limit=0.25,
-        p=0.4
-    ),
-
-    A.GaussNoise(
-        std_range=(0.05, 0.1),
-        p=0.2
-    ),
-
-    # Simulates camera compression
-    A.ImageCompression(
-        quality_range=(60, 100),
-        p=0.3
-    ),
-
-    # Slight blur from camera focus
-    A.GaussianBlur(
-        blur_limit=(3,5),
-        p=0.2
-    ),
-
-    # Lighting color changes
-    A.HueSaturationValue(
-        hue_shift_limit=8,
-        sat_shift_limit=15,
-        val_shift_limit=10,
-        p=0.3
-    ),
-
-    # Slight perspective distortion from angled photos
-    A.Perspective(
-        scale=(0.02, 0.05),
-        p=0.25
-    ),
-
-    # Small crop then resize (simulates imperfect square detection)
-    A.RandomResizedCrop(
-        size=(128,128),
-        scale=(0.9,1.0),
-        ratio=(0.95,1.05),
-        p=0.3
-    )
+    A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
+    A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
+    A.GaussNoise(std_range=(0.05, 0.1), p=0.2),
+    A.ImageCompression(quality_range=(60, 100), p=0.3),
+    A.GaussianBlur(blur_limit=(3,5), p=0.2),
+    A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
+    A.Perspective(scale=(0.02, 0.05), p=0.25),
+    A.ElasticTransform(alpha=1, sigma=5, p=0.1),  # subtle shape distortion
+    A.GridDistortion(num_steps=3, distort_limit=0.05, p=0.1),
     ])
     
     NUM_AUGMENTATIONS = 5
@@ -411,58 +378,15 @@ def dataPreprocessingRed(data,data_augmentation=False,colour=False):
 
     augmentation_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3),
-
-    A.ShiftScaleRotate(
-        shift_limit=0.05,
-        scale_limit=0.05,
-        rotate_limit=5,
-        p=0.3
-    ),
-
-    A.RandomBrightnessContrast(
-        brightness_limit=0.25,
-        contrast_limit=0.25,
-        p=0.4
-    ),
-
-    A.GaussNoise(
-        std_range=(0.05, 0.1),
-        p=0.2
-    ),
-
-    # Simulates camera compression
-    A.ImageCompression(
-        quality_range=(60, 100),
-        p=0.3
-    ),
-
-    # Slight blur from camera focus
-    A.GaussianBlur(
-        blur_limit=(3,5),
-        p=0.2
-    ),
-
-    # Lighting color changes
-    A.HueSaturationValue(
-        hue_shift_limit=8,
-        sat_shift_limit=15,
-        val_shift_limit=10,
-        p=0.3
-    ),
-
-    # Slight perspective distortion from angled photos
-    A.Perspective(
-        scale=(0.02, 0.05),
-        p=0.25
-    ),
-
-    # Small crop then resize (simulates imperfect square detection)
-    A.RandomResizedCrop(
-        size=(128,128),
-        scale=(0.9,1.0),
-        ratio=(0.95,1.05),
-        p=0.3
-    )
+    A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
+    A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
+    A.GaussNoise(std_range=(0.05, 0.1), p=0.2),
+    A.ImageCompression(quality_range=(60, 100), p=0.3),
+    A.GaussianBlur(blur_limit=(3,5), p=0.2),
+    A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
+    A.Perspective(scale=(0.02, 0.05), p=0.25),
+    A.ElasticTransform(alpha=1, sigma=5, p=0.1),  # subtle shape distortion
+    A.GridDistortion(num_steps=3, distort_limit=0.05, p=0.1),
 ])
     
     NUM_AUGMENTATIONS = 5
@@ -566,58 +490,15 @@ def dataPreprocessingZenodo(data,data_augmentation=False,colour=False):
 
     augmentation_pipeline = A.Compose([
     A.Rotate(limit=5, p=0.3),
-
-    A.ShiftScaleRotate(
-        shift_limit=0.05,
-        scale_limit=0.05,
-        rotate_limit=5,
-        p=0.3
-    ),
-
-    A.RandomBrightnessContrast(
-        brightness_limit=0.25,
-        contrast_limit=0.25,
-        p=0.4
-    ),
-
-    A.GaussNoise(
-        std_range=(0.05, 0.1),
-        p=0.2
-    ),
-
-    # Simulates camera compression
-    A.ImageCompression(
-        quality_range=(60, 100),
-        p=0.3
-    ),
-
-    # Slight blur from camera focus
-    A.GaussianBlur(
-        blur_limit=(3,5),
-        p=0.2
-    ),
-
-    # Lighting color changes
-    A.HueSaturationValue(
-        hue_shift_limit=8,
-        sat_shift_limit=15,
-        val_shift_limit=10,
-        p=0.3
-    ),
-
-    # Slight perspective distortion from angled photos
-    A.Perspective(
-        scale=(0.02, 0.05),
-        p=0.25
-    ),
-
-    # Small crop then resize (simulates imperfect square detection)
-    A.RandomResizedCrop(
-        size=(128,128),
-        scale=(0.9,1.0),
-        ratio=(0.95,1.05),
-        p=0.3
-    )
+    A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=5, p=0.3),
+    A.RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4),
+    A.GaussNoise(std_range=(0.05, 0.1), p=0.2),
+    A.ImageCompression(quality_range=(60, 100), p=0.3),
+    A.GaussianBlur(blur_limit=(3,5), p=0.2),
+    A.HueSaturationValue(hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=10, p=0.3),
+    A.Perspective(scale=(0.02, 0.05), p=0.25),
+    A.ElasticTransform(alpha=1, sigma=5, p=0.1),  # subtle shape distortion
+    A.GridDistortion(num_steps=3, distort_limit=0.05, p=0.1),
 ])
     
     NUM_AUGMENTATIONS = 5
@@ -708,7 +589,7 @@ def savePreprocessedData(images,validation=False):
         count += 1
     return paths
 
-def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=30, batch_size=32,sample_weights=None):
+def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=30, batch_size=32,class_weight_dict=None):
     base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
     base_model.trainable = False  # freeze for initial training
     model = models.Sequential([
@@ -721,9 +602,16 @@ def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, ep
     ])
     early_stop = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=5,
+        patience=250,
         restore_best_weights=True
     )
+    checkpoint_frozen = tf.keras.callbacks.ModelCheckpoint(
+    filepath='best_model_frozen.keras',
+    monitor='val_loss',
+    save_best_only=True,
+    save_weights_only=False,  # save full model
+    verbose=1
+)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
     # indices = np.arange(len(x))
@@ -739,33 +627,55 @@ def denseNetPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, ep
 
     # sw_train,sw_val = sample_weights[train_idx], sample_weights[val_idx]
 
-    model.fit(
+    history_frozen = model.fit(
         train_dataset,
-            validation_data=val_dataset,
-        epochs=epochs
-        # callbacks=[early_stop]
+        validation_data=val_dataset,
+        epochs=epochs,
+        callbacks=[checkpoint_frozen]
     )
+    # model.load_weights('best_model_frozen.keras')  # Load best weights before fine-tuning
 
-    # print("Unfreezing base model for fine-tuning...")
-    # base_model.trainable = True
-
-    # for layer in base_model.layers[:-50]:  # Freeze all but last 40 layers
-    #     layer.trainable = False
+    model = tf.keras.models.load_model('best_model_frozen.keras')
+    base_model = model.layers[0]  # Extract the base model from the loaded model
+    best_frozen_loss = min(history_frozen.history['val_loss'])
     
-    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-6), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    # # x_train, x_val, y_train, y_val = train_test_split(
-    # # x, y,
-    # # test_size=0.2,
-    # # stratify=y,
-    # # random_state=42
-    # # )
+    if best_frozen_loss > 0.155:
+        print("Frozen model did not perform well enough, skipping fine-tuning.")
+        return (model,best_frozen_loss)
+    
+    checkpoint_finetuned = tf.keras.callbacks.ModelCheckpoint(
+    filepath='best_model_finetuned.keras',
+    monitor='val_loss',
+    save_best_only=True,
+    save_weights_only=False,
+    initial_value_threshold=best_frozen_loss,  # must beat frozen best to save
+    verbose=1
+    )
+    print("Unfreezing base model for fine-tuning...")
+    base_model.trainable = True
 
-    # model.fit(
-    #     train_dataset,
-    #     validation_data=val_dataset,
-    #     epochs=epochs*2,
+    for layer in base_model.layers[:-200]:  # Freeze all but last 40 layers
+        layer.trainable = False
+    
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-6), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # x_train, x_val, y_train, y_val = train_test_split(
+    # x, y,
+    # test_size=0.2,
+    # stratify=y,
+    # random_state=42
     # )
-    return model
+
+    history_fineTuned = model.fit(
+        train_dataset,
+        validation_data=val_dataset,
+        epochs=300,
+        callbacks=[early_stop,checkpoint_finetuned]
+    )
+    if os.path.exists('best_model_finetuned.keras'):
+        model = tf.keras.models.load_model('best_model_finetuned.keras')
+    else:
+        model = tf.keras.models.load_model('best_model_frozen.keras')
+    return (model,min(history_fineTuned.history['val_loss']))
 
 def trainPieceRecognitionModel(train_dataset, val_dataset, num_classes=13, epochs=45, batch_size=32):
 
@@ -872,7 +782,6 @@ def loadImage(path,label,augmentation=False,colour=False):
     else:
         img = tf.cast(img, tf.float32)
     #write file to check if augmentation is working
-    tf.io.write_file(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\inspection\\augmented_test_{augmentation}.png", tf.image.encode_png(tf.cast(img*255, tf.uint8)))
     # img = tf.image.convert_image_dtype(img, tf.float32)
     if colour:
         img = preprocess_input(img)
@@ -890,7 +799,8 @@ def trainModel(color=False):
     training_my, val_my = train_test_split(training_dataMy, test_size=0.2, random_state=42)
     training_red, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
     training_zenodo, val_zenodo = train_test_split(training_dataZenodo, test_size=0.2, random_state=42)
-    print("Preprocessing data...")
+
+    
     preprocessed_dataMy = dataPreprocessingMy(training_my, data_augmentation=False,colour=color)
     preprocessed_dataRed = dataPreprocessingRed(training_red, data_augmentation=False,colour=color)
     preprocessed_dataZenodo = dataPreprocessingZenodo(training_zenodo, data_augmentation=False,colour=color)
@@ -900,13 +810,46 @@ def trainModel(color=False):
     preprocessed_dataZenodo_Val = dataPreprocessingZenodo(val_zenodo, data_augmentation=False,colour=color)
     print(f"Preprocessed data. Total samples after augmentation: {len(preprocessed_dataRed) + len(preprocessed_dataZenodo) + len(preprocessed_dataMy)}")
     
+    # Count samples
+    # train_counts = [
+    #     len(preprocessed_dataMy),
+    #     len(preprocessed_dataRed),
+    #     len(preprocessed_dataZenodo)
+    # ]
+
+    # val_counts = [
+    #     len(preprocessed_dataMy_Val),
+    #     len(preprocessed_dataRed_Val),
+    #     len(preprocessed_dataZenodo_Val)
+    # ]
+
+    # datasets = ['My', 'Red', 'Zenodo']
+
+    # # X positions
+    # x = np.arange(len(datasets))
+    # width = 0.35
+
+    # # Plot
+    # plt.figure(figsize=(8,5))
+    # plt.bar(x - width/2, train_counts, width, label='Training')
+    # plt.bar(x + width/2, val_counts, width, label='Validation')
+
+    # plt.xlabel("Dataset")
+    # plt.ylabel("Number of Samples")
+    # plt.title("Training vs Validation Samples per Dataset")
+    # plt.xticks(x, datasets)
+    # plt.legend()
+
+    # plt.tight_layout()
+    # plt.show()
+    print("Preprocessing data...")
 
     print("Getting ready to train the model...")
 
     # all_preprocessed_data = preprocessed_dataRed + preprocessed_dataZenodo
-    all = preprocessed_dataRed  + preprocessed_dataMy
+    all =  preprocessed_dataMy + preprocessed_dataRed
 
-    all_val = preprocessed_dataRed_Val  + preprocessed_dataMy_Val
+    all_val =   preprocessed_dataMy_Val + preprocessed_dataRed_Val
 
     # x = []
     # y = []
@@ -930,6 +873,22 @@ def trainModel(color=False):
     for square, label in all_val:
         labels_val.append(label)
     
+    int_to_piece = {
+    0: 'empty', 1: 'P', 2: 'N', 3: 'B', 4: 'R',
+    5: 'Q', 6: 'K', 7: 'p', 8: 'n', 9: 'b',
+    10: 'r', 11: 'q', 12: 'k'
+    }
+
+    train_counts = Counter(label for _, label in all)
+    val_counts = Counter(label for _, label in all_val)
+
+    print("\n--- Class Distribution ---")
+    print(f"{'Class':<10} {'Train':>8} {'Val':>8}")
+    print("-" * 28)
+    for cls in range(13):
+        print(f"{int_to_piece[cls]:<10} {train_counts.get(cls, 0):>8} {val_counts.get(cls, 0):>8}")
+    print(f"{'TOTAL':<10} {sum(train_counts.values()):>8} {sum(val_counts.values()):>8}")
+
     paths = savePreprocessedData(all)
     paths_val = savePreprocessedData(all_val, validation=True)
     
@@ -966,13 +925,18 @@ def trainModel(color=False):
     # print(np.unique(y))
     # print(y[:20])
     # print(x.nbytes / 1e9, "GB")
+    val = 0.0
     if not color:
         model = trainPieceRecognitionModel(train_ds,val_ds)
     else:
-        model = denseNetPieceRecognitionModel(train_ds,val_ds)
-    model.save("piece_recognition_model.h5")
-    model.save_weights("piece_recognition_weights.h5")
-
+            
+            all_labels = [label for _, label in all]
+            class_weights = compute_class_weight('balanced', classes=np.arange(13), y=all_labels)
+            class_weight_dict = dict(enumerate(class_weights))
+            model, val = denseNetPieceRecognitionModel(train_ds,val_ds, class_weight_dict=class_weight_dict)
+    # model.save("piece_recognition_model.h5")
+    # model.save_weights("piece_recognition_weights.h5")
+    return (model,val)
     # testModel(model)
 
 def testModel(model, weight, color=False):
@@ -981,32 +945,21 @@ def testModel(model, weight, color=False):
     test_data = get_testingImages(colour=color)
     test_data = dataPreprocessingRed(test_data, data_augmentation=False, colour=color)
 
-    x_test, y_test = zip(*test_data)
+    labels_test = [label for _, label in test_data]
+    paths_test = savePreprocessedData(test_data, validation=True)
 
-    x_test = np.array(x_test)
-    y_test = np.array(y_test)
+    paths_test = tf.constant(paths_test)
+    labels_test = tf.constant(labels_test)
 
-    if color:
-        x_test = preprocess_input(x_test)
-    model.evaluate(x_test, y_test)
-    # Confusion matrix
-    y_pred = np.argmax(model.predict(x_test), axis=1)
+    test_ds = (tf.data.Dataset.from_tensor_slices((paths_test, labels_test))
+               .map(lambda path, label: loadImage(path, label, augmentation=False, colour=color), num_parallel_calls=tf.data.AUTOTUNE)
+               .batch(32)
+               .prefetch(tf.data.AUTOTUNE)
+    )
 
-    int_to_piece = {
-        0: 'empty', 1: 'P', 2: 'N', 3: 'B', 4: 'R',
-        5: 'Q', 6: 'K', 7: 'p', 8: 'n', 9: 'b',
-        10: 'r', 11: 'q', 12: 'k'
-    }
-    
-    class_names = [int_to_piece[i] for i in range(13)]
-    
-    cm = confusion_matrix(y_test, y_pred)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
-    fig, ax = plt.subplots(figsize=(12, 12))
-    disp.plot(ax=ax, colorbar=False)
-    plt.title("Piece Recognition Confusion Matrix")
-    plt.tight_layout()
-    plt.show()
+    loss, accuracy = model.evaluate(test_ds, verbose=1)
+    print(f"Test Loss: {loss:.4f} | Test Accuracy: {accuracy:.4f}")
+    return accuracy
 
 def labels_to_fen(predicted_labels):
     fen_rows = []
@@ -1031,39 +984,29 @@ def labels_to_fen(predicted_labels):
 
 def makePredictions(model, weight, image, color=False):
     model.load_weights(weight)
-    squares = BoardSegmentation.getSquaresFromImage(image,colour=color)
-    preprocessed_squares = []
-    for sq in squares:
-        resized_sq = sq
-        if color:
-            resized_sq = cv2.resize(sq, (128, 128))
-        else:
-            resized_sq = cv2.resize(sq, (64, 64))
-        grey_sq = resized_sq
-        #show the square being predicted
-        # plt.imshow(grey_sq, cmap='gray')
-        # plt.title(f"Square being predicted")
-        # plt.axis('off')
-        # plt.show()
-        if not color:
-            grey_sq = cv2.cvtColor(resized_sq, cv2.COLOR_BGR2GRAY)
-        norm_sq = grey_sq
-
-        if not color:
-            norm_sq = norm_sq / 255.0
-            norm_sq = norm_sq[...,None] # add channel dimension
-        preprocessed_squares.append(norm_sq)
-    preprocessed_squares = np.array(preprocessed_squares)
-    if color:
-        preprocessed_squares = preprocess_input(preprocessed_squares)
-    predictions = model.predict(preprocessed_squares)
-    # print(predictions)
+    squares = BoardSegmentation.getSquaresFromImage(image, colour=color)
+    
+    # Save squares temporarily like the pipeline does
+    square_data = [(sq, 0) for sq in squares]  # dummy label 0
+    paths = savePreprocessedData(square_data, validation=True)
+    
+    paths_tf = tf.constant(paths)
+    labels_tf = tf.constant([0] * len(paths))
+    
+    pred_ds = (tf.data.Dataset.from_tensor_slices((paths_tf, labels_tf))
+               .map(lambda path, label: loadImage(path, label, augmentation=False, colour=color), num_parallel_calls=tf.data.AUTOTUNE)
+               .batch(32)
+               .prefetch(tf.data.AUTOTUNE)
+    )
+    
+    predictions = model.predict(pred_ds)
     predicted_labels = np.argmax(predictions, axis=1)
     probs = np.max(predictions, axis=1)
     print(predicted_labels)
     print(probs)
-    return (predicted_labels,probs)
-def visualisePredictions(predicted_labels):
+    return (predicted_labels, predictions[np.newaxis, ...])
+
+def visualisePredictions(predicted_labels,filePath):
     int_to_piece = {
         0: '',
         1: 'P',
@@ -1087,9 +1030,55 @@ def visualisePredictions(predicted_labels):
 
     print(predicted_pieces)
     print(fen_string)
-    Visual_Representation.visualize_fen(fen_string)
+    Visual_Representation.visualize_fen(fen_string, filePath)
 
+def getValidationAccuracy(color=False):
+    model = tf.keras.models.load_model('piece_recognition_model.h5')
+    model.load_weights('piece_recognition_weights.h5')
+    
+    (training_dataRed, training_dataZenodo, training_dataMy) = loadTrainingData(color)
+    
+    _, val_my = train_test_split(training_dataMy, test_size=0.2, random_state=42)
+    _, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
 
-trainModel(True)
-testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
-visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\r5k1_pp5p_2pp4_4p3_nPP3p1_4P1P1_P1P5_3R1NK1,b,-,-,0,23.jpg", color=True)[0])
+    preprocessed_val_my = dataPreprocessingMy(val_my, data_augmentation=False, colour=color)
+    preprocessed_val_red = dataPreprocessingRed(val_red, data_augmentation=False, colour=color)
+
+    all_val = preprocessed_val_my + preprocessed_val_red
+
+    labels_val = [label for _, label in all_val]
+    paths_val = savePreprocessedData(all_val, validation=True)
+
+    paths_val = tf.constant(paths_val)
+    labels_val = tf.constant(labels_val)
+
+    val_ds = (tf.data.Dataset.from_tensor_slices((paths_val, labels_val))
+               .map(lambda path, label: loadImage(path, label, augmentation=False, colour=color), num_parallel_calls=tf.data.AUTOTUNE)
+               .batch(32)
+               .prefetch(tf.data.AUTOTUNE)
+    )
+
+    loss, accuracy = model.evaluate(val_ds, verbose=1)
+    print(f"Validation Loss: {loss:.4f} | Validation Accuracy: {accuracy:.4f}")
+    return accuracy
+
+# getValidationAccuracy(color=True)
+# bestVal = float('inf')
+# bestTestAcc = 0.0
+# while True:
+#     model,val = trainModel(True)
+#     testAcc = testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+#     if val < bestVal:
+#         bestVal = val
+#         model.save("piece_recognition_model.h5")
+#         model.save_weights("piece_recognition_weights.h5")
+#         print(f"New best validation loss: {bestVal}")
+#         print(f"Test accuracy at this point: {testAcc}")
+#     if math.isclose(val, bestVal, rel_tol=1e-4):
+#         if testAcc > bestTestAcc:
+#             model.save("piece_recognition_model.h5")
+#             model.save_weights("piece_recognition_weights.h5")
+#             bestTestAcc = testAcc
+#         print(f"New best test accuracy: {bestTestAcc}")
+# testModel(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5",True)
+# visualisePredictions(makePredictions(tf.keras.models.load_model("piece_recognition_model.h5"), "piece_recognition_weights.h5", "C:\\Users\\Callu\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages\\rnbqk2r_ppp1bppp_3p1n2_4p3_2B1P3_P4N2_1PPP1PPP_RNBQK2R,w,KQkq,-,1,5.jpg", color=True)[0], "pipeline_prediction.png")
