@@ -18,7 +18,12 @@ def loadFensFromFile(filename):
 def cameraSetup():
     print("Initializing camera...")
     cam = cv2.VideoCapture(0)
-    print("Camera initialized")
+    # Set 720p resolution
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Optional: keep only latest frame to avoid lag
+    cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    print("Camera initialized at 720p")
     return cam
 
 def FEN_To_Filename(fen):
@@ -31,8 +36,7 @@ def captureBoardImage(cam, fen):
     result, image = cam.read()
     if result:
         state = getGameStateFromFEN(fen)
-        # cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\{state}\\{FEN_To_Filename(fen)}.jpg", image)
-        cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers\\{FEN_To_Filename(fen)}.jpg", image)
+        cv2.imwrite(f"C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\{state}\\{FEN_To_Filename(fen)}.jpg", image)
         print(f"Image Captured")
     else:
         print("Error capturing image")
@@ -102,9 +106,9 @@ while True:
 
     print(f"Displaying position for FEN: {fen}")
     print(f"Game State: {state}")
-    if state == "endgame":
+    if state == "opening":
         print_ascii(fen)
-        # Visual_Representation.visualize_fen(fen,"none.png")
+        Visual_Representation.visualize_fen(fen,"none.png")
         option = input("Press 's' to skip or anything else to capture image...")
         if(option.lower() != 's'):
             captureBoardImage(camera, fen)
