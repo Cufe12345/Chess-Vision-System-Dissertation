@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.applications.densenet import preprocess_input
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay,f1_score
 import math
+from pathlib import Path
 
 def fen_to_labels(fen):
     """
@@ -47,8 +48,9 @@ def fen_to_labels(fen):
 def get_chessRedImages():
     """Load chessRed images
     """
-    folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
-    folder_path2 = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
+    base_dir = Path(__file__).parent
+    folder_path = base_dir / "trainingData" / "chessRed" / "FinalImages"
+    folder_path2 = Path("trainingData") / "fillers"
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     image_files = [
@@ -76,9 +78,10 @@ def get_chessRedImages():
 
 def get_myImages():
     """Load my images"""
-    path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-    path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-    path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+    base_dir = Path(__file__).parent / "trainingData"
+    path_opening = base_dir / "opening"
+    path_midgame = base_dir / "midgame"
+    path_endgame = base_dir / "endgame"
 
     image_filesO = [
     os.path.join(path_opening, f)
@@ -121,7 +124,7 @@ def get_myImages():
 
 def get_testingImages():
     """Load testing images"""
-    path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages"
+    path_testing = Path(__file__).parent / "trainingData" / "testingImages"
 
 
     image_files = [
@@ -218,10 +221,11 @@ def dataPreprocessing(data):
 def savePreprocessedData(images,validation=False):
     """Save preprocessed images to disk for later use in training"""
     
-    save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processed"
+    base_dir = Path(__file__).parent
+    save_path = base_dir / "processed"
 
     if validation:
-        save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processedValidation"
+        save_path = base_dir / "processedValidation"
     print("Removing old processed images...")
     for filename in os.listdir(save_path):
         os.remove(os.path.join(save_path, filename))

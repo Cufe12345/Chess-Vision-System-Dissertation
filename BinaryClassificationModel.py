@@ -6,6 +6,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import layers, models
 import os
 import BoardSegmentation
+from pathlib import Path
 
 def trainModel(x,y,epochs=20):
 
@@ -65,8 +66,9 @@ def fen_to_labels(fen):
 def get_chessRedImages():
     """Load chessRed images
     """
-    folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
-    folder_path2 = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
+    base_dir = Path(__file__).parent
+    folder_path = base_dir / "trainingData" / "chessRed" / "FinalImages"
+    folder_path2 = Path("trainingData") / "fillers"
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     image_files = [
@@ -94,9 +96,10 @@ def get_chessRedImages():
 
 def get_myImages():
     """Load my images"""
-    path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-    path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-    path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+    base_dir = Path(__file__).parent / "trainingData"
+    path_opening = base_dir / "opening"
+    path_midgame = base_dir / "midgame"
+    path_endgame = base_dir / "endgame"
 
     image_filesO = [
     os.path.join(path_opening, f)

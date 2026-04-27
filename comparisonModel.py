@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, 
 import EndToEndModel as E2E
 import PieceRecognitionModel as PRM
 import tensorflow as tf
+from pathlib import Path
 
 
 def trainCombiner(X, y):
@@ -74,8 +75,9 @@ def getCombinerTrainingData(pieceModel, pieceWeights, endToEndModel, endToEndWei
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     #ChessReD
-    folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages"
-    folder_path2 = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
+    base_dir = Path(__file__).parent
+    folder_path = base_dir / "trainingData" / "chessRed" / "FinalImages"
+    folder_path2 = Path("trainingData") / "fillers"
     all_red = [
         os.path.join(folder_path, f)
         for f in os.listdir(folder_path)
@@ -89,9 +91,10 @@ def getCombinerTrainingData(pieceModel, pieceWeights, endToEndModel, endToEndWei
     _, val_red = train_test_split(all_red, test_size=0.2, random_state=42)
 
     #My Data
-    path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-    path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-    path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+    base_dir = Path(__file__).parent / "trainingData"
+    path_opening = base_dir / "opening"
+    path_midgame = base_dir / "midgame"
+    path_endgame = base_dir / "endgame"
     all_my = []
     for folder in [path_opening, path_midgame, path_endgame]:
         all_my += [os.path.join(folder, f) for f in os.listdir(folder)

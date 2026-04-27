@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from PIL import Image, ImageOps
 import math
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
+from pathlib import Path
 
 
 def fen_to_labels(fen):
@@ -48,8 +49,9 @@ def fen_to_labels(fen):
 def get_chessRedImages():
     """Load chessRed images
     """
-    folder_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\chessRed\\FinalImages_end"
-    folder_path2 = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\fillers"
+    base_dir = Path(__file__).parent
+    folder_path = base_dir / "trainingData" / "chessRed" / "FinalImages_end"
+    folder_path2 = Path("trainingData") / "fillers"
     image_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     image_files = [
@@ -78,9 +80,11 @@ def get_chessRedImages():
 
 def get_myImages():
     """Loads my images"""
-    path_opening = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\opening"
-    path_midgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\midgame"
-    path_endgame = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\endgame"
+
+    base_dir = Path(__file__).parent / "trainingData"
+    path_opening = base_dir / "opening"
+    path_midgame = base_dir / "midgame"
+    path_endgame = base_dir / "endgame"
 
     image_filesO = [
     os.path.join(path_opening, f)
@@ -123,7 +127,7 @@ def get_myImages():
 
 def get_testingImages():
     """Fetches the testing images and its labels"""
-    path_testing = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\trainingData\\testingImages2"
+    path_testing = Path(__file__).parent / "trainingData" / "testingImages2"
 
 
     image_files = [
@@ -213,10 +217,11 @@ augmentation_pipeline_128 = A.Compose([
 
 def clearProcessedFolder(validation=False):
     """Clears the processed folder of old images before saving new ones"""
-    save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processed_end_to_end"
+    base_dir = Path(__file__).parent
+    save_path = base_dir / "processed_end_to_end"
 
     if validation:
-        save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processedValidation_end_to_end"
+        save_path = base_dir / "processedValidation_end_to_end"
     print("Removing old processed images...")
     for filename in os.listdir(save_path):
         os.remove(os.path.join(save_path, filename))
@@ -226,10 +231,11 @@ def clearProcessedFolder(validation=False):
 def savePreprocessedData(images,validation=False):
     """Saves the preprocessed images to a folder and returns the paths to those images"""
     
-    save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processed_end_to_end"
+    base_dir = Path(__file__).parent
+    save_path = base_dir / "processed_end_to_end"
 
     if validation:
-        save_path = "C:\\Users\\Callu\\Documents\\MyDocuments\\University\\Year3\\Dissertation\\Code\\processedValidation_end_to_end"
+        save_path = base_dir / "processedValidation_end_to_end"
     count = 0
     paths = []
     for img, label in images:
