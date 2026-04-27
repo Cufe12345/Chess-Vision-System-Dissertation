@@ -20,6 +20,8 @@ __pycache__/
 **/best_model_finetuned.keras
 **/best_model_frozen.keras
 **/best_model.keras
+**/temp_model.h5
+**/temp_weights.h5
 
 # Folders
 Experimenting/

@@ -469,10 +469,10 @@ def getValidationAccuracy():
     training_my, val_my = train_test_split(training_dataMy, test_size=0.2, random_state=42)
     training_red, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
 
-    preprocessed_train_my = dataPreprocessing(training_my, data_augmentation=False)
-    preprocessed_train_red = dataPreprocessing(training_red, data_augmentation=False)
-    preprocessed_val_my = dataPreprocessing(val_my, data_augmentation=False)
-    preprocessed_val_red = dataPreprocessing(val_red, data_augmentation=False)
+    preprocessed_train_my = dataPreprocessing(training_my)
+    preprocessed_train_red = dataPreprocessing(training_red)
+    preprocessed_val_my = dataPreprocessing(val_my)
+    preprocessed_val_red = dataPreprocessing(val_red)
 
     all_train = preprocessed_train_my + preprocessed_train_red
     all_val = preprocessed_val_my + preprocessed_val_red

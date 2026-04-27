@@ -366,11 +366,11 @@ def trainModel():
     training_red, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
 
     print("Preprocessing data...")
-    preprocessed_dataRed = dataPreprocessingRed(training_red, data_augmentation=False)
-    preprocessed_dataMy = dataPreprocessingRed(training_my, data_augmentation=False)
+    preprocessed_dataRed = dataPreprocessingRed(training_red)
+    preprocessed_dataMy = dataPreprocessingRed(training_my)
 
-    preprocessed_dataRed_Val = dataPreprocessingRed(val_red, data_augmentation=False)
-    preprocessed_dataMy_Val = dataPreprocessingRed(val_my, data_augmentation=False)
+    preprocessed_dataRed_Val = dataPreprocessingRed(val_red)
+    preprocessed_dataMy_Val = dataPreprocessingRed(val_my)
 
 
     print(f"Preprocessed data. Total samples after augmentation: {len(preprocessed_dataRed) + len(preprocessed_dataMy)}")
@@ -421,7 +421,7 @@ def testModel(model, weight):
     model.load_weights(weight)
 
     test_data = get_testingImages()
-    test_data = dataPreprocessingRed(test_data, data_augmentation=False)
+    test_data = dataPreprocessingRed(test_data)
 
     labels_test = [label for _, label in test_data]
     paths_test = savePreprocessedData(test_data, validation=True)
@@ -470,15 +470,15 @@ def getValidationAccuracy():
     model = tf.keras.models.load_model('end_to_end_model.h5')
     model.load_weights('end_to_end_weights.h5')
 
-    (training_dataRed, training_dataMy, _) = getTrainingData()
+    (training_dataRed, training_dataMy) = getTrainingData()
 
     training_my, val_my = train_test_split(training_dataMy, test_size=0.2, random_state=42)
     training_red, val_red = train_test_split(training_dataRed, test_size=0.2, random_state=42)
 
-    preprocessed_train_my = dataPreprocessingRed(training_my, data_augmentation=False)
-    preprocessed_train_red = dataPreprocessingRed(training_red, data_augmentation=False)
-    preprocessed_val_my = dataPreprocessingRed(val_my, data_augmentation=False)
-    preprocessed_val_red = dataPreprocessingRed(val_red, data_augmentation=False)
+    preprocessed_train_my = dataPreprocessingRed(training_my)
+    preprocessed_train_red = dataPreprocessingRed(training_red)
+    preprocessed_val_my = dataPreprocessingRed(val_my)
+    preprocessed_val_red = dataPreprocessingRed(val_red)
 
     all_train = preprocessed_train_my + preprocessed_train_red
     all_val = preprocessed_val_my + preprocessed_val_red
@@ -582,13 +582,13 @@ def MultipleTrainingRuns(count):
         if val < bestVal:
             bestVal = val
             model.save("end_to_end_model.h5")
-            model.save_weights("end_to_end_weights.h5.h5")
+            model.save_weights("end_to_end_weights.h5")
             print(f"New best validation loss: {bestVal}")
             print(f"Test accuracy at this point: {testAcc}")
         if math.isclose(val, bestVal, rel_tol=1e-4):
             if testAcc > bestTestAcc:
                 model.save("end_to_end_model.h5")
-                model.save_weights("end_to_end_weights.h5.h5")
+                model.save_weights("end_to_end_weights.h5")
                 bestTestAcc = testAcc
             print(f"New best test accuracy: {bestTestAcc}")
         count -= 1
