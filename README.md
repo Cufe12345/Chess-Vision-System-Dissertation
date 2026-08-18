@@ -10,3 +10,14 @@ The second approach is an end-to-end model which aims to identify all pieces fro
 
 The predictions from both models, with their given certainty for each square is passed into a logistic regression model to give a final output prediction.
 
+## Usage
+
+ChessVisionSystem.py -h provides you with all the options you can make.
+
+Arguments:
+  -train : Train a model
+  -test : Test accuracy of a model
+  -unseen : Test on unseen data
+  -predict -imgPath : Predict on a single image using full vision system [Note ensure vision system is trained first]
+
+  
